@@ -247,6 +247,48 @@ class NodeCPUWatcher:
         except Exception:
             return float("inf")
 
+    def _create_cpu_bar(self, cpu_pct: float, width: int = 20) -> str:
+        """
+        Create htop-style visual bar from CPU percentage.
+        Returns a colored bar string using Unicode block characters.
+        """
+        if cpu_pct < 0:
+            cpu_pct = 0.0
+        elif cpu_pct > 100:
+            cpu_pct = 100.0
+
+        # Calculate filled blocks
+        filled = (cpu_pct / 100.0) * width
+        filled_blocks = int(filled)
+        partial = filled - filled_blocks
+
+        # Determine partial block character
+        if partial < 0.25:
+            partial_char = ""
+        elif partial < 0.5:
+            partial_char = "░"
+        elif partial < 0.75:
+            partial_char = "▒"
+        else:
+            partial_char = "▓"
+
+        # Build the bar
+        bar = "█" * filled_blocks
+        if filled_blocks < width and partial_char:
+            bar += partial_char
+            filled_blocks += 1
+        bar += "░" * (width - filled_blocks)
+
+        # Apply color based on CPU percentage
+        if cpu_pct > 80:
+            color = "red"
+        elif cpu_pct > 50:
+            color = "yellow"
+        else:
+            color = "green"
+
+        return f"[{color}]{bar}[/{color}]"
+
     def get_node_metrics(self) -> Dict[str, Tuple[float, float, float, float]]:
         """
         Fetch node CPU usage using kubectl top.
@@ -597,9 +639,9 @@ class NodeCPUWatcher:
         table.add_column("Status", style="cyan", width=10)
         table.add_column("CPU (cores)", justify="right", style="magenta", width=10)
         table.add_column("CPU %", justify="right", style="yellow", width=7)
+        table.add_column("CPU", min_width=20)
         table.add_column("Mem (Mi)", justify="right", style="green", width=10)
         table.add_column("Mem %", justify="right", style="green", width=7)
-        table.add_column("Trend", min_width=30)
 
         # First add aggregate 'all' row
         total_cores = sum(v[0] for v in metrics.values()) if metrics else 0.0
@@ -621,22 +663,14 @@ class NodeCPUWatcher:
             pct_str = "N/A"
             mem_str = "N/A"
             mem_pct_str = "N/A"
+            cpu_bar = "N/A"
         else:
             cores_str = f"{total_cores:.2f}"
             pct_str = f"{avg_pct:.1f}"
             mem_str = f"{total_mem_mib:.0f}"
             mem_pct_str = f"{avg_mem_pct:.1f}"
+            cpu_bar = self._create_cpu_bar(avg_pct)
 
-        all_history = self.cpu_history.get("all", [])
-        if all_history and len(all_history) > 1:
-            try:
-                all_spark = sparklines.sparklines(all_history, minimum=0, maximum=100)[
-                    0
-                ]
-            except Exception:
-                all_spark = "─"
-        else:
-            all_spark = "─"
         all_row_style = "reverse bold" if selected_node == "all" else None
         table.add_row(
             "all",
@@ -644,9 +678,9 @@ class NodeCPUWatcher:
             "-",
             cores_str,
             pct_str,
+            cpu_bar,
             mem_str,
             mem_pct_str,
-            all_spark,
             style=all_row_style,
         )
 
@@ -655,7 +689,6 @@ class NodeCPUWatcher:
 
         for node_name in sorted_nodes:
             cpu_cores, cpu_pct, mem_mib, mem_pct = metrics[node_name]
-            history = self.cpu_history.get(node_name, [])
 
             # In vcluster with zero metrics, show as unavailable
             if self.is_vcluster and cpu_cores == 0.0 and cpu_pct == 0.0:
@@ -663,7 +696,7 @@ class NodeCPUWatcher:
                 cpu_pct_str = "N/A"
                 mem_mib_str = "N/A"
                 mem_pct_str = "N/A"
-                spark = "─"
+                cpu_bar = "N/A"
             else:
                 # Determine color based on CPU percentage
                 if cpu_pct > 80:
@@ -677,17 +710,7 @@ class NodeCPUWatcher:
                 cpu_pct_str = f"[{color}]{cpu_pct:.1f}[/{color}]"
                 mem_mib_str = f"{mem_mib:.0f}"
                 mem_pct_str = f"{mem_pct:.1f}"
-
-                # Create sparkline if we have history
-                if history and len(history) > 1:
-                    try:
-                        spark = sparklines.sparklines(history, minimum=0, maximum=100)[
-                            0
-                        ]
-                    except Exception:
-                        spark = "─"
-                else:
-                    spark = "─"
+                cpu_bar = self._create_cpu_bar(cpu_pct)
 
             row_style = "reverse bold" if selected_node == node_name else None
             table.add_row(
@@ -696,13 +719,56 @@ class NodeCPUWatcher:
                 self.node_status.get(node_name, ""),
                 cpu_cores_str,
                 cpu_pct_str,
+                cpu_bar,
                 mem_mib_str,
                 mem_pct_str,
-                spark,
                 style=row_style,
             )
 
         return table
+
+    def format_aggregate_trend(self) -> Panel:
+        """
+        Create a btop-style trend display for cluster aggregate CPU usage.
+        Shows sparkline graph of the "all" aggregate history.
+        """
+        all_history = self.cpu_history.get("all", [])
+
+        if all_history and len(all_history) > 1:
+            try:
+                spark = sparklines.sparklines(all_history, minimum=0, maximum=100)[0]
+            except Exception:
+                spark = "─"
+        else:
+            spark = "─"
+
+        # Calculate current average CPU percentage and stats
+        if all_history:
+            current_pct = all_history[-1] if all_history else 0.0
+            if len(all_history) > 1:
+                min_pct = min(all_history)
+                max_pct = max(all_history)
+            else:
+                min_pct = max_pct = current_pct
+        else:
+            current_pct = min_pct = max_pct = 0.0
+
+        # Format the trend display with extra spacing for better visibility
+        trend_text = Text()
+        trend_text.append("Cluster CPU: ", style="bold cyan")
+        trend_text.append(f"{current_pct:.1f}%", style="yellow")
+        if len(all_history) > 1:
+            trend_text.append("  (", style="dim")
+            trend_text.append(f"min: {min_pct:.1f}%", style="dim")
+            trend_text.append(", ", style="dim")
+            trend_text.append(f"max: {max_pct:.1f}%", style="dim")
+            trend_text.append(")", style="dim")
+        trend_text.append("\n", style="dim")
+        trend_text.append(spark, style="green")
+
+        return Panel(
+            trend_text, title="Cluster Trend", border_style="cyan", padding=(1, 1)
+        )
 
     def format_pods_table(
         self,
@@ -893,7 +959,7 @@ class NodeCPUWatcher:
         info_text.append("\n")
 
         # Build action options based on pod type
-        actions = ["Describe", "Logs"]
+        actions = ["Describe", "Logs", "List Namespace Resources"]
         if is_vcluster_pod:
             actions.append("Connect to vCluster")
         actions.extend(["Delete", "Cancel"])
@@ -991,9 +1057,12 @@ class NodeCPUWatcher:
                         num_nodes
                     )
 
+                    # Trend panel height for better visibility (6 lines: title + border + content with extra space)
+                    trend_panel_height = 6
+
                     # Update pod window size based on available terminal space
                     self.pod_window_size = self._calculate_pod_window_size(
-                        nodes_panel_height
+                        nodes_panel_height + trend_panel_height
                     )
 
                     # Build or update structure
@@ -1001,11 +1070,13 @@ class NodeCPUWatcher:
                     if not layout.children:
                         layout.split_column(
                             Layout(name="title", size=3),
+                            Layout(name="trend", size=trend_panel_height),
                             Layout(name="nodes", size=nodes_panel_height),
                             Layout(name="controls", size=controls_panel_size),
                             Layout(name="pods"),
                         )
                     else:
+                        layout["trend"].size = trend_panel_height
                         layout["nodes"].size = nodes_panel_height
                         layout["controls"].size = controls_panel_size
 
@@ -1075,6 +1146,23 @@ class NodeCPUWatcher:
                             )
                         layout["controls"].update(Panel(controls_table, padding=(0, 2)))
                         self._last_controls_sig = controls_sig
+
+                    # Trend panel - update when history changes
+                    all_history = self.cpu_history.get("all", [])
+                    trend_sig = (
+                        tuple(all_history[-10:])
+                        if len(all_history) >= 10
+                        else tuple(all_history)
+                    )
+                    if (
+                        not hasattr(self, "_last_trend_sig")
+                        or trend_sig != self._last_trend_sig
+                    ):
+                        layout["trend"].update(self.format_aggregate_trend())
+                        self._last_trend_sig = trend_sig
+                    elif not layout["trend"].renderable:
+                        # Ensure trend panel is initialized on first render
+                        layout["trend"].update(self.format_aggregate_trend())
 
                     # Nodes table - update only if signature changed
                     # refresh node metadata periodically (cheap)
@@ -1312,6 +1400,28 @@ class NodeCPUWatcher:
                                                 f"{cmd_prev} > /tmp/k8s-logs-{pod_name}.txt && less -R +G /tmp/k8s-logs-{pod_name}.txt; rm -f /tmp/k8s-logs-{pod_name}.txt || echo 'No logs available' | less -R"
                                             )
 
+                                        self._enable_raw_mode()
+                                        live.update(layout, refresh=True)
+                                    elif action == "List Namespace Resources":
+                                        # List all resources in the pod's namespace
+                                        self._disable_raw_mode()
+                                        self.console.clear()
+                                        self.console.print(
+                                            f"[cyan]Listing all resources in namespace '{namespace}'...[/cyan]\n"
+                                        )
+                                        subprocess.run(
+                                            [
+                                                "kubectl",
+                                                "get",
+                                                "pods,services,deployments,secrets,configmaps,ingresses,pvc",
+                                                "-n",
+                                                namespace,
+                                            ]
+                                        )
+                                        self.console.print(
+                                            "\n[yellow]Press Enter to continue...[/yellow]"
+                                        )
+                                        input()
                                         self._enable_raw_mode()
                                         live.update(layout, refresh=True)
                                     elif action == "Delete":
