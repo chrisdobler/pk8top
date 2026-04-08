@@ -1,0 +1,29 @@
+{
+  "name": "pk8top",
+  "version": "2.0.0",
+  "type": "module",
+  "bin": {
+    "pk8top": "./dist/index.js"
+  },
+  "scripts": {
+    "dev": "tsx src/index.tsx",
+    "build": "tsup src/index.tsx --format esm --out-dir dist --banner.js '#!/usr/bin/env node'",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "ink": "^5.2.0",
+    "ink-text-input": "^6.0.0",
+    "react": "^18.3.1",
+    "zustand": "^5.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/react": "^18.3.0",
+    "ink-testing-library": "^4.0.0",
+    "tsup": "^8.3.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  }
+}
