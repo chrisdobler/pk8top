@@ -5,6 +5,8 @@ import {
   parseRestartAgeSeconds,
   formatRestartAge,
   createCpuBarChars,
+  parseNodeMetrics,
+  parsePodTopAndGet,
 } from '../src/lib/parsers.js'
 
 describe('parseMemoryMi', () => {
@@ -57,5 +59,125 @@ describe('createCpuBarChars', () => {
   })
   it('clamps percent above 100', () => {
     expect(createCpuBarChars(200, 20).text.length).toBe(20)
+  })
+})
+
+const NODE_TOP_STDOUT = `node-1   500m   10%   1024Mi   40%
+node-2   1500m   30%   2048Mi   70%`
+
+const NODE_GET_JSON = JSON.stringify({
+  items: [
+    {
+      metadata: {
+        name: 'node-1',
+        labels: { 'node-role.kubernetes.io/control-plane': '' },
+      },
+      status: {
+        conditions: [{ type: 'Ready', status: 'True' }],
+      },
+    },
+    {
+      metadata: { name: 'node-2', labels: {} },
+      status: {
+        conditions: [{ type: 'Ready', status: 'False' }],
+      },
+    },
+  ],
+})
+
+const POD_TOP_STDOUT = `default   frontend-abc   100m   256Mi
+kube-system   coredns-xyz   50m   128Mi`
+
+const POD_GET_JSON = JSON.stringify({
+  items: [
+    {
+      metadata: { name: 'frontend-abc', namespace: 'default', labels: {} },
+      spec: { nodeName: 'node-1' },
+      status: {
+        phase: 'Running',
+        containerStatuses: [{ state: { running: {} }, lastState: {} }],
+      },
+    },
+    {
+      metadata: { name: 'coredns-xyz', namespace: 'kube-system', labels: {} },
+      spec: { nodeName: 'node-1' },
+      status: {
+        phase: 'Running',
+        containerStatuses: [],
+      },
+    },
+  ],
+})
+
+describe('parseNodeMetrics', () => {
+  it('parses two nodes', () => {
+    const nodes = parseNodeMetrics(NODE_TOP_STDOUT, NODE_GET_JSON)
+    expect(nodes).toHaveLength(2)
+  })
+  it('parses CPU correctly', () => {
+    const nodes = parseNodeMetrics(NODE_TOP_STDOUT, NODE_GET_JSON)
+    expect(nodes[0].cpuCores).toBeCloseTo(0.5)
+    expect(nodes[0].cpuPercent).toBeCloseTo(10)
+  })
+  it('parses memory correctly', () => {
+    const nodes = parseNodeMetrics(NODE_TOP_STDOUT, NODE_GET_JSON)
+    expect(nodes[0].memoryMi).toBeCloseTo(1024)
+    expect(nodes[0].memoryPercent).toBeCloseTo(40)
+  })
+  it('assigns role from metadata', () => {
+    const nodes = parseNodeMetrics(NODE_TOP_STDOUT, NODE_GET_JSON)
+    expect(nodes[0].role).toBe('control-plane')
+    expect(nodes[1].role).toBe('worker')
+  })
+  it('assigns Ready status', () => {
+    const nodes = parseNodeMetrics(NODE_TOP_STDOUT, NODE_GET_JSON)
+    expect(nodes[0].status).toBe('Ready')
+    expect(nodes[1].status).toBe('NotReady')
+  })
+  it('returns empty array on empty input', () => {
+    expect(parseNodeMetrics('', NODE_GET_JSON)).toHaveLength(0)
+  })
+})
+
+describe('parsePodTopAndGet', () => {
+  it('parses two pods', () => {
+    const pods = parsePodTopAndGet(POD_TOP_STDOUT, POD_GET_JSON)
+    expect(pods).toHaveLength(2)
+  })
+  it('sets cpu and memory from top output', () => {
+    const pods = parsePodTopAndGet(POD_TOP_STDOUT, POD_GET_JSON)
+    const frontend = pods.find((p) => p.name === 'frontend-abc')!
+    expect(frontend.cpuCores).toBeCloseTo(0.1)
+    expect(frontend.memoryMi).toBeCloseTo(256)
+  })
+  it('sets status from pod phase', () => {
+    const pods = parsePodTopAndGet(POD_TOP_STDOUT, POD_GET_JSON)
+    expect(pods[0].status).toBe('Running')
+  })
+  it('defaults to zero metrics when pod not in top output', () => {
+    const pods = parsePodTopAndGet('', POD_GET_JSON)
+    expect(pods[0].cpuCores).toBe(0)
+  })
+  it('marks vcluster pods by namespace', () => {
+    const vclusterPodGet = JSON.stringify({
+      items: [{
+        metadata: { name: 'vcluster-0', namespace: 'my-vcluster', labels: {} },
+        spec: { nodeName: 'node-1' },
+        status: { phase: 'Running', containerStatuses: [] },
+      }],
+    })
+    const pods = parsePodTopAndGet('', vclusterPodGet)
+    expect(pods[0].isVcluster).toBe(true)
+  })
+  it('marks vcluster pods by label', () => {
+    const vclusterPodGet = JSON.stringify({
+      items: [{
+        metadata: { name: 'vc-0', namespace: 'default', labels: { app: 'vcluster' } },
+        spec: { nodeName: 'node-1' },
+        status: { phase: 'Running', containerStatuses: [] },
+      }],
+    })
+    const pods = parsePodTopAndGet('', vclusterPodGet)
+    expect(pods[0].isVcluster).toBe(true)
   })
 })
