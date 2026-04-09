@@ -18,18 +18,22 @@ export default function PodsPanel({ windowSize = 20 }: Props) {
   const setFilterText = usePodsStore((s) => s.setFilterText)
   const focusedPanel = useUiStore((s) => s.focusedPanel)
 
-  const windowStart = Math.max(0, Math.min(scrollOffset, Math.max(0, selectedIndex - Math.floor(windowSize / 2))))
+  // Auto-scroll to keep selected index visible
+  let windowStart = scrollOffset
+  if (selectedIndex < windowStart) windowStart = selectedIndex
+  if (selectedIndex >= windowStart + windowSize) windowStart = selectedIndex - windowSize + 1
+  windowStart = Math.max(0, windowStart)
   const windowedPods = filteredPods.slice(windowStart, windowStart + windowSize)
 
   return (
     <Box flexDirection="column" paddingX={1}>
       <Box>
-        <Text bold>{'  POD'.padEnd(35)}</Text>
-        <Text bold>{'NS'.padEnd(20)}</Text>
-        <Text bold>{'CPU'.padStart(7)}</Text>
-        <Text bold>{'MEM(Mi)'.padStart(9)}</Text>
-        <Text bold>{'  STATUS'.padEnd(20)}</Text>
-        <Text bold>{'RESTART'.padStart(8)}</Text>
+        <Box width={37}><Text bold>  POD</Text></Box>
+        <Box width={22}><Text bold>NS</Text></Box>
+        <Box width={8}><Text bold>CPU</Text></Box>
+        <Box width={10}><Text bold>MEM(Mi)</Text></Box>
+        <Box width={22}><Text bold>STATUS</Text></Box>
+        <Box width={8}><Text bold>RESTART</Text></Box>
       </Box>
 
       {windowedPods.length === 0 && (
@@ -49,14 +53,16 @@ export default function PodsPanel({ windowSize = 20 }: Props) {
 
         return (
           <Box key={`${pod.namespace}/${pod.name}`}>
-            <Text bold={isSelected} backgroundColor={isSelected ? 'blue' : undefined}>
-              {`  ${pod.name}`.padEnd(35).slice(0, 35)}
-            </Text>
-            <Text>{pod.namespace.padEnd(20).slice(0, 20)}</Text>
-            <Text>{`${(pod.cpuCores * 1000).toFixed(0)}m`.padStart(7)}</Text>
-            <Text>{`${pod.memoryMi.toFixed(0)}`.padStart(9)}</Text>
-            <Text color={statusColor}>{'  '}{pod.status.padEnd(18).slice(0, 18)}</Text>
-            <Text>{formatRestartAge(pod.lastRestartAgeSeconds).padStart(8)}</Text>
+            <Box width={37}>
+              <Text bold={isSelected} backgroundColor={isSelected ? 'blue' : undefined}>
+                {'  '}{pod.name.slice(0, 34)}
+              </Text>
+            </Box>
+            <Box width={22}><Text>{pod.namespace.slice(0, 21)}</Text></Box>
+            <Box width={8}><Text>{(pod.cpuCores * 1000).toFixed(0)}m</Text></Box>
+            <Box width={10}><Text>{pod.memoryMi.toFixed(0)}</Text></Box>
+            <Box width={22}><Text color={statusColor}>{pod.status.slice(0, 21)}</Text></Box>
+            <Box width={8}><Text>{formatRestartAge(pod.lastRestartAgeSeconds)}</Text></Box>
           </Box>
         )
       })}

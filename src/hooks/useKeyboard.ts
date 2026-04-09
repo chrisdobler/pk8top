@@ -89,7 +89,6 @@ export function useKeyboard() {
       const maxIdx = Math.max(0, pods.filteredPods.length - 1)
       if (key.upArrow || input === 'k') {
         pods.setSelectedIndex(Math.max(0, pods.selectedIndex - 1))
-        pods.setScrollOffset(Math.min(pods.scrollOffset, pods.selectedIndex - 1))
       } else if (key.downArrow || input === 'j') {
         pods.setSelectedIndex(Math.min(maxIdx, pods.selectedIndex + 1))
       } else if (key.leftArrow || input === 'h') {

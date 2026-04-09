@@ -22,29 +22,36 @@ export default function NodesPanel() {
   return (
     <Box flexDirection="column" paddingX={1}>
       <Box>
-        <Text bold>{'  NODE'.padEnd(20)}</Text>
-        <Text bold>{'CPU%'.padStart(6)}</Text>
-        <Text bold>  {'BAR'.padEnd(BAR_WIDTH)}</Text>
-        <Text bold>{'MEM%'.padStart(6)}</Text>
-        <Text bold>  ROLE</Text>
+        <Box width={22}><Text bold>  NODE</Text></Box>
+        <Box width={8}><Text bold>CPU%</Text></Box>
+        <Box width={22}><Text bold>BAR</Text></Box>
+        <Box width={8}><Text bold>MEM%</Text></Box>
+        <Box><Text bold>ROLE</Text></Box>
       </Box>
       {nodes.map((node, i) => {
         const isSelected = i === selectedIndex && focusedPanel === 'nodes'
         const bar = createCpuBarChars(node.cpuPercent, BAR_WIDTH)
         return (
           <Box key={node.name}>
-            <Text bold={isSelected} backgroundColor={isSelected ? 'blue' : undefined}>
-              {`  ${node.name}`.padEnd(20)}
-            </Text>
-            <Text color={node.cpuPercent > 80 ? 'red' : node.cpuPercent > 50 ? 'yellow' : 'green'}>
-              {`${node.cpuPercent.toFixed(1)}%`.padStart(6)}
-            </Text>
-            <Text>{'  '}</Text>
-            <Text color={bar.color}>{bar.text}</Text>
-            <Text color={node.memoryPercent > 80 ? 'red' : node.memoryPercent > 50 ? 'yellow' : 'green'}>
-              {`${node.memoryPercent.toFixed(1)}%`.padStart(6)}
-            </Text>
-            <Text>{'  '}{node.role}</Text>
+            <Box width={22}>
+              <Text bold={isSelected} backgroundColor={isSelected ? 'blue' : undefined}>
+                {'  '}{node.name}
+              </Text>
+            </Box>
+            <Box width={8}>
+              <Text color={node.cpuPercent > 80 ? 'red' : node.cpuPercent > 50 ? 'yellow' : 'green'}>
+                {node.cpuPercent.toFixed(1)}%
+              </Text>
+            </Box>
+            <Box width={22}>
+              <Text color={bar.color}>{bar.text}</Text>
+            </Box>
+            <Box width={8}>
+              <Text color={node.memoryPercent > 80 ? 'red' : node.memoryPercent > 50 ? 'yellow' : 'green'}>
+                {node.memoryPercent.toFixed(1)}%
+              </Text>
+            </Box>
+            <Box><Text>{node.role}</Text></Box>
           </Box>
         )
       })}
