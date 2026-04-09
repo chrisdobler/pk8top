@@ -31,7 +31,8 @@ export default function App({ config }: Props) {
   useMetricsFetcher(config.interval)
   useKeyboard()
 
-  const totalHeight = stdout?.rows ?? 24
+  // Subtract 1 for Ink's trailing cursor line
+  const totalHeight = (stdout?.rows ?? 24) - 1
   const nodesHeight = NODES_OVERHEAD + Math.max(1, nodeCount)
   const podsHeight = totalHeight - TREND_HEIGHT - nodesHeight - CONTROLS_HEIGHT
   // windowSize = podsHeight minus border(2) + title(1) + header(1) = 4 rows of overhead
