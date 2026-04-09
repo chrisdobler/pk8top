@@ -7,12 +7,21 @@ import { formatRestartAge } from '../lib/parsers.js'
 
 interface Props {
   windowSize?: number
+  height?: number
 }
 
-// Fixed-width columns: CPU(10) + Memory(10) + Status(18) + Restarts(10) = 48
-const FIXED_COLS = 48
+// Fixed-width portion: indent(2) + CPU(10) + Memory(10) + Status(18) + Restarts(10) = 50
+const FIXED = 2 + 10 + 10 + 18 + 10
 
-export default function PodsPanel({ windowSize = 20 }: Props) {
+function pad(s: string, w: number): string {
+  return s.length >= w ? s.slice(0, w - 1) + '…' : s.padEnd(w)
+}
+
+function rpad(s: string, w: number): string {
+  return s.padStart(w).slice(0, w)
+}
+
+export default function PodsPanel({ windowSize = 20, height }: Props) {
   const filteredPods = usePodsStore((s) => s.filteredPods)
   const selectedIndex = usePodsStore((s) => s.selectedIndex)
   const scrollOffset = usePodsStore((s) => s.scrollOffset)
@@ -33,10 +42,10 @@ export default function PodsPanel({ windowSize = 20 }: Props) {
   const windowedPods = filteredPods.slice(windowStart, windowStart + windowSize)
 
   // Compute variable column widths, capped to terminal
-  const innerWidth = termWidth - 4  // border(2) + paddingX(2)
-  const budget = innerWidth - FIXED_COLS
+  const innerWidth = termWidth - 4
+  const budget = innerWidth - FIXED
 
-  const maxNs = Math.max(12, ...windowedPods.map((p) => p.namespace.length)) + 4
+  const maxNs = Math.max(12, ...windowedPods.map((p) => p.namespace.length)) + 2
   const maxPod = Math.max(6, ...windowedPods.map((p) => p.name.length)) + 2
   const maxNode = Math.max(6, ...windowedPods.map((p) => p.nodeName.length)) + 2
 
@@ -51,56 +60,42 @@ export default function PodsPanel({ windowSize = 20 }: Props) {
     nodeW = Math.max(8, budget - nsW - podW)
   }
 
+  const mkRow = (ns: string, name: string, cpu: string, mem: string, status: string, restart: string, node: string) =>
+    '  ' + pad(ns, nsW) + pad(name, podW) + rpad(cpu, 10) + rpad(mem, 10) + pad(status, 18) + rpad(restart, 10) + pad(node, nodeW)
+
   const title = nodeFilter
     ? ` Pods on ${nodeFilter} by ${sortMode.charAt(0).toUpperCase() + sortMode.slice(1)} • ${filteredPods.length} pods`
     : ` Top Pods by ${sortMode.charAt(0).toUpperCase() + sortMode.slice(1)} • ${filteredPods.length} pods`
 
   return (
-    <Box borderStyle="round" flexDirection="column" paddingX={1} width="100%">
+    <Box borderStyle="round" flexDirection="column" paddingX={1} width={termWidth} height={height}>
       <Text bold>{title}</Text>
-      <Box overflowX="hidden">
-        <Box width={nsW}><Text bold>  Namespace</Text></Box>
-        <Box width={podW}><Text bold>Pod</Text></Box>
-        <Box width={10}><Text bold>CPU</Text></Box>
-        <Box width={10}><Text bold>Memory</Text></Box>
-        <Box width={18}><Text bold>Status</Text></Box>
-        <Box width={10}><Text bold>Restarts</Text></Box>
-        <Box width={nodeW}><Text bold>Node</Text></Box>
-      </Box>
+      <Text bold>{mkRow('Namespace', 'Pod', 'CPU', 'Memory', 'Status', 'Restarts', 'Node')}</Text>
 
       {windowedPods.length === 0 && (
-        <Box paddingX={2}>
-          <Text dimColor>No pods found</Text>
-        </Box>
+        <Text dimColor>  No pods found</Text>
       )}
 
       {windowedPods.map((pod, i) => {
         const actualIndex = windowStart + i
         const isSelected = actualIndex === selectedIndex && focusedPanel === 'pods'
-        const statusColor =
-          pod.status === 'Running' ? 'green'
-          : pod.status === 'Pending' ? 'yellow'
-          : pod.status === 'Succeeded' ? 'cyan'
-          : 'red'
-
+        const line = mkRow(
+          pod.namespace,
+          pod.name,
+          (pod.cpuCores * 1000).toFixed(0) + 'm',
+          pod.memoryMi.toFixed(0) + 'Mi',
+          pod.status,
+          formatRestartAge(pod.lastRestartAgeSeconds),
+          pod.nodeName,
+        )
         return (
-          <Box key={`${pod.namespace}/${pod.name}/${i}`} overflowX="hidden">
-            <Box width={nsW}>
-              <Text bold={isSelected} backgroundColor={isSelected ? 'blue' : undefined} wrap="truncate">
-                {'  '}{pod.namespace}
-              </Text>
-            </Box>
-            <Box width={podW}>
-              <Text bold={isSelected} backgroundColor={isSelected ? 'blue' : undefined} wrap="truncate">
-                {pod.name}
-              </Text>
-            </Box>
-            <Box width={10}><Text>{(pod.cpuCores * 1000).toFixed(0)}m</Text></Box>
-            <Box width={10}><Text>{pod.memoryMi.toFixed(0)}Mi</Text></Box>
-            <Box width={18}><Text color={statusColor} wrap="truncate">{pod.status}</Text></Box>
-            <Box width={10}><Text>{formatRestartAge(pod.lastRestartAgeSeconds)}</Text></Box>
-            <Box width={nodeW}><Text dimColor wrap="truncate">{pod.nodeName}</Text></Box>
-          </Box>
+          <Text
+            key={`${pod.namespace}/${pod.name}/${i}`}
+            bold={isSelected}
+            backgroundColor={isSelected ? 'blue' : undefined}
+          >
+            {line}
+          </Text>
         )
       })}
 

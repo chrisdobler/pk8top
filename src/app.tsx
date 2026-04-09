@@ -8,30 +8,41 @@ import PodActionModal from './components/PodActionModal.js'
 import { useMetricsFetcher } from './hooks/useMetricsFetcher.js'
 import { useKeyboard } from './hooks/useKeyboard.js'
 import { useUiStore } from './store/ui.js'
+import { useNodesStore } from './store/nodes.js'
 import type { AppConfig } from './types.js'
 
 interface Props {
   config: AppConfig
 }
 
+// Panel heights (including borders):
+// TrendPanel: border(2) + title(1) + 3 graph rows = 6
+// NodesPanel: border(2) + title(1) + header(1) + nodeCount
+// ControlsBar: border(2) + content(1) = 3
+const TREND_HEIGHT = 6
+const NODES_OVERHEAD = 4 // border + title + header
+const CONTROLS_HEIGHT = 3
+
 export default function App({ config }: Props) {
   const { stdout } = useStdout()
   const showModal = useUiStore((s) => s.showModal)
+  const nodeCount = useNodesStore((s) => s.nodes.length)
 
   useMetricsFetcher(config.interval)
   useKeyboard()
 
   const totalHeight = stdout?.rows ?? 24
-  const podsWindowSize = Math.max(5, totalHeight - 15)
+  const nodesHeight = NODES_OVERHEAD + Math.max(1, nodeCount)
+  const podsHeight = Math.max(8, totalHeight - TREND_HEIGHT - nodesHeight - CONTROLS_HEIGHT)
+  // windowSize = podsHeight minus border(2) + title(1) + header(1) = 4 rows of overhead
+  const podsWindowSize = Math.max(3, podsHeight - 4)
 
   return (
     <Box flexDirection="column" height={totalHeight}>
       <TrendPanel />
       <NodesPanel />
       <ControlsBar />
-      <Box flexGrow={1}>
-        <PodsPanel windowSize={podsWindowSize} />
-      </Box>
+      <PodsPanel windowSize={podsWindowSize} height={podsHeight} />
       {showModal && <PodActionModal />}
     </Box>
   )

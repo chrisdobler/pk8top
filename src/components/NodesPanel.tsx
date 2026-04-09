@@ -5,8 +5,16 @@ import { useUiStore } from '../store/ui.js'
 import { createCpuBarChars } from '../lib/parsers.js'
 
 const BAR_WIDTH = 20
-// Fixed-width columns: Status(10) + CPU%(8) + BAR(22) + Mem%(8) = 48
-const FIXED_COLS = 48
+// Fixed-width portion: indent(2) + Status(10) + CPU%(8) + gap(2) + BAR(20) + Mem%(8) = 50
+const FIXED = 2 + 10 + 8 + 2 + BAR_WIDTH + 8
+
+function pad(s: string, w: number): string {
+  return s.length >= w ? s.slice(0, w - 1) + '…' : s.padEnd(w)
+}
+
+function rpad(s: string, w: number): string {
+  return s.padStart(w).slice(0, w)
+}
 
 export default function NodesPanel() {
   const nodes = useNodesStore((s) => s.nodes)
@@ -17,17 +25,16 @@ export default function NodesPanel() {
 
   if (nodes.length === 0) {
     return (
-      <Box borderStyle="round" paddingX={1} width="100%">
+      <Box borderStyle="round" paddingX={1} width={termWidth}>
         <Text dimColor>Waiting for node metrics…</Text>
       </Box>
     )
   }
 
-  // Inner width = terminal - border(2) - paddingX(2)
   const innerWidth = termWidth - 4
-  const budget = innerWidth - FIXED_COLS
+  const budget = innerWidth - FIXED
 
-  const maxName = Math.max(6, ...nodes.map((n) => n.name.length)) + 4
+  const maxName = Math.max(6, ...nodes.map((n) => n.name.length)) + 2
   const maxRole = Math.max(6, ...nodes.map((n) => n.role.length)) + 2
 
   let nameW: number, roleW: number
@@ -39,47 +46,32 @@ export default function NodesPanel() {
     roleW = Math.max(8, budget - nameW)
   }
 
+  const mkRow = (name: string, role: string, status: string, cpu: string, bar: string, mem: string) =>
+    '  ' + pad(name, nameW) + pad(role, roleW) + pad(status, 10) + rpad(cpu, 8) + '  ' + bar.padEnd(BAR_WIDTH) + rpad(mem, 8)
+
   return (
-    <Box borderStyle="round" flexDirection="column" paddingX={1} width="100%">
+    <Box borderStyle="round" flexDirection="column" paddingX={1} width={termWidth}>
       <Text bold> Kubernetes Node Metrics</Text>
-      <Box>
-        <Box width={nameW}><Text bold>  Node</Text></Box>
-        <Box width={roleW}><Text bold>Roles</Text></Box>
-        <Box width={10}><Text bold>Status</Text></Box>
-        <Box width={8}><Text bold>CPU%</Text></Box>
-        <Box width={BAR_WIDTH + 2}><Text bold>CPU</Text></Box>
-        <Box width={8}><Text bold>Mem%</Text></Box>
-      </Box>
+      <Text bold>{mkRow('Node', 'Roles', 'Status', 'CPU%', 'CPU', 'Mem%')}</Text>
       {nodes.map((node, i) => {
         const isSelected = i === selectedIndex && focusedPanel === 'nodes'
         const bar = createCpuBarChars(node.cpuPercent, BAR_WIDTH)
+        const line = mkRow(
+          node.name,
+          node.role,
+          node.status,
+          node.cpuPercent.toFixed(1) + '%',
+          bar.text,
+          node.memoryPercent.toFixed(1) + '%',
+        )
         return (
-          <Box key={node.name}>
-            <Box width={nameW}>
-              <Text bold={isSelected} backgroundColor={isSelected ? 'blue' : undefined} wrap="truncate">
-                {'  '}{node.name}
-              </Text>
-            </Box>
-            <Box width={roleW}>
-              <Text dimColor wrap="truncate">{node.role}</Text>
-            </Box>
-            <Box width={10}>
-              <Text color={node.status === 'Ready' ? 'green' : 'red'}>{node.status}</Text>
-            </Box>
-            <Box width={8}>
-              <Text color={node.cpuPercent > 80 ? 'red' : node.cpuPercent > 50 ? 'yellow' : 'green'}>
-                {node.cpuPercent.toFixed(1)}%
-              </Text>
-            </Box>
-            <Box width={BAR_WIDTH + 2}>
-              <Text color={bar.color}>{bar.text}</Text>
-            </Box>
-            <Box width={8}>
-              <Text color={node.memoryPercent > 80 ? 'red' : node.memoryPercent > 50 ? 'yellow' : 'green'}>
-                {node.memoryPercent.toFixed(1)}%
-              </Text>
-            </Box>
-          </Box>
+          <Text
+            key={node.name}
+            bold={isSelected}
+            backgroundColor={isSelected ? 'blue' : undefined}
+          >
+            {line}
+          </Text>
         )
       })}
     </Box>
