@@ -10,7 +10,7 @@ export default function ControlsBar() {
   const lastError = useUiStore((s) => s.lastError)
 
   return (
-    <Box flexDirection="column" paddingX={1}>
+    <Box borderStyle="round" flexDirection="column" paddingX={1} width="100%">
       <Box>
         <Text dimColor>↑↓/jk </Text>
         <Text dimColor>navigate  </Text>

@@ -4,6 +4,7 @@ function run(args: string[]): { stdout: string; stderr: string; ok: boolean } {
   const result = spawnSync('kubectl', args, {
     encoding: 'utf8',
     timeout: 15000,
+    maxBuffer: 50 * 1024 * 1024,
   })
   return {
     stdout: result.stdout ?? '',

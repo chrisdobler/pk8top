@@ -47,9 +47,9 @@ export default function TrendPanel() {
   const rows = buildTrendRows(allHistory)
 
   return (
-    <Box flexDirection="column" paddingX={1}>
+    <Box borderStyle="round" flexDirection="column" paddingX={1} width="100%">
       <Box>
-        <Text bold color="cyan">Cluster CPU: </Text>
+        <Text bold color="cyan"> Cluster CPU: </Text>
         <Text color="yellow">{current.toFixed(1)}%</Text>
         {allHistory.length > 1 && (
           <Text dimColor>  (min: {min.toFixed(1)}%, max: {max.toFixed(1)}%)</Text>

@@ -16,6 +16,7 @@ export default function PodsPanel({ windowSize = 20 }: Props) {
   const showFilter = usePodsStore((s) => s.showFilter)
   const filterText = usePodsStore((s) => s.filterText)
   const setFilterText = usePodsStore((s) => s.setFilterText)
+  const sortMode = usePodsStore((s) => s.sortMode)
   const focusedPanel = useUiStore((s) => s.focusedPanel)
 
   // Auto-scroll to keep selected index visible
@@ -25,15 +26,20 @@ export default function PodsPanel({ windowSize = 20 }: Props) {
   windowStart = Math.max(0, windowStart)
   const windowedPods = filteredPods.slice(windowStart, windowStart + windowSize)
 
+  // Compute column widths from visible data
+  const nsW = Math.max(12, ...windowedPods.map((p) => p.namespace.length)) + 4
+  const podW = Math.max(6, ...windowedPods.map((p) => p.name.length)) + 2
+
   return (
-    <Box flexDirection="column" paddingX={1}>
+    <Box borderStyle="round" flexDirection="column" paddingX={1} width="100%">
+      <Text bold> Top Pods by {sortMode.charAt(0).toUpperCase() + sortMode.slice(1)} • {filteredPods.length} pods</Text>
       <Box>
-        <Box width={37}><Text bold>  POD</Text></Box>
-        <Box width={22}><Text bold>NS</Text></Box>
-        <Box width={8}><Text bold>CPU</Text></Box>
-        <Box width={10}><Text bold>MEM(Mi)</Text></Box>
-        <Box width={22}><Text bold>STATUS</Text></Box>
-        <Box width={8}><Text bold>RESTART</Text></Box>
+        <Box width={nsW}><Text bold>  Namespace</Text></Box>
+        <Box width={podW}><Text bold>Pod</Text></Box>
+        <Box width={10}><Text bold>CPU</Text></Box>
+        <Box width={10}><Text bold>Memory</Text></Box>
+        <Box width={18}><Text bold>Status</Text></Box>
+        <Box width={10}><Text bold>Restarts</Text></Box>
       </Box>
 
       {windowedPods.length === 0 && (
@@ -52,17 +58,21 @@ export default function PodsPanel({ windowSize = 20 }: Props) {
           : 'red'
 
         return (
-          <Box key={`${pod.namespace}/${pod.name}`}>
-            <Box width={37}>
+          <Box key={`${pod.namespace}/${pod.name}/${i}`}>
+            <Box width={nsW}>
               <Text bold={isSelected} backgroundColor={isSelected ? 'blue' : undefined}>
-                {'  '}{pod.name.slice(0, 34)}
+                {'  '}{pod.namespace}
               </Text>
             </Box>
-            <Box width={22}><Text>{pod.namespace.slice(0, 21)}</Text></Box>
-            <Box width={8}><Text>{(pod.cpuCores * 1000).toFixed(0)}m</Text></Box>
-            <Box width={10}><Text>{pod.memoryMi.toFixed(0)}</Text></Box>
-            <Box width={22}><Text color={statusColor}>{pod.status.slice(0, 21)}</Text></Box>
-            <Box width={8}><Text>{formatRestartAge(pod.lastRestartAgeSeconds)}</Text></Box>
+            <Box width={podW}>
+              <Text bold={isSelected} backgroundColor={isSelected ? 'blue' : undefined}>
+                {pod.name}
+              </Text>
+            </Box>
+            <Box width={10}><Text>{(pod.cpuCores * 1000).toFixed(0)}m</Text></Box>
+            <Box width={10}><Text>{pod.memoryMi.toFixed(0)}Mi</Text></Box>
+            <Box width={18}><Text color={statusColor}>{pod.status.slice(0, 17)}</Text></Box>
+            <Box width={10}><Text>{formatRestartAge(pod.lastRestartAgeSeconds)}</Text></Box>
           </Box>
         )
       })}
