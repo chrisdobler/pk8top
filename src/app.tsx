@@ -31,19 +31,17 @@ export default function App({ config }: Props) {
   useMetricsFetcher(config.interval)
   useKeyboard()
 
-  // Subtract 1 for Ink's trailing cursor line
-  const totalHeight = (stdout?.rows ?? 24) - 1
+  const termRows = stdout?.rows ?? 24
   const nodesHeight = NODES_OVERHEAD + Math.max(1, nodeCount)
-  const podsHeight = totalHeight - TREND_HEIGHT - nodesHeight - CONTROLS_HEIGHT
-  // windowSize = podsHeight minus border(2) + title(1) + header(1) = 4 rows of overhead
+  const podsHeight = termRows - TREND_HEIGHT - nodesHeight - CONTROLS_HEIGHT
   const podsWindowSize = Math.max(1, podsHeight - 4)
 
   return (
-    <Box flexDirection="column" height={totalHeight}>
-      <TrendPanel />
-      <NodesPanel />
-      <ControlsBar />
-      <PodsPanel windowSize={podsWindowSize} height={podsHeight} />
+    <Box flexDirection="column" height={termRows}>
+      <Box height={TREND_HEIGHT}><TrendPanel /></Box>
+      <Box height={nodesHeight}><NodesPanel /></Box>
+      <Box height={CONTROLS_HEIGHT}><ControlsBar /></Box>
+      <Box height={podsHeight}><PodsPanel windowSize={podsWindowSize} height={podsHeight} /></Box>
       {showModal && <PodActionModal />}
     </Box>
   )

@@ -27,4 +27,17 @@ function parseArgs(): AppConfig {
   return { interval, historyPoints }
 }
 
-render(<App config={parseArgs()} />, { exitOnCtrlC: true })
+// Enter alternate screen buffer (like htop/vim)
+process.stdout.write('\x1b[?1049h')
+process.stdout.write('\x1b[?25l') // hide cursor
+
+function cleanup() {
+  process.stdout.write('\x1b[?25h') // show cursor
+  process.stdout.write('\x1b[?1049l') // leave alternate screen
+}
+
+process.on('exit', cleanup)
+process.on('SIGINT', () => { cleanup(); process.exit(0) })
+process.on('SIGTERM', () => { cleanup(); process.exit(0) })
+
+render(<App config={parseArgs()} />, { exitOnCtrlC: false })
