@@ -9,6 +9,7 @@ import type { PodMetric } from '../../src/types.js'
 const pod = (name: string, overrides: Partial<PodMetric> = {}): PodMetric => ({
   name,
   namespace: 'default',
+  nodeName: 'node-1',
   cpuCores: 0.1,
   memoryMi: 128,
   status: 'Running',

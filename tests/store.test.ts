@@ -7,6 +7,7 @@ import type { PodMetric, NodeMetric } from '../src/types.js'
 const makePod = (overrides: Partial<PodMetric> = {}): PodMetric => ({
   name: 'test-pod',
   namespace: 'default',
+  nodeName: 'node-1',
   cpuCores: 0.1,
   memoryMi: 128,
   status: 'Running',
@@ -23,6 +24,7 @@ beforeEach(() => {
     filterText: '',
     showFilter: false,
     sortMode: 'cpu',
+    nodeFilter: '',
     selectedIndex: 0,
     scrollOffset: 0,
   })

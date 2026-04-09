@@ -167,10 +167,12 @@ export function parsePodTopAndGet(topStdout: string, getPodsJson: string): PodMe
     const data = JSON.parse(getPodsJson) as { items: unknown[] }
     for (const item of data.items as Record<string, unknown>[]) {
       const meta = (item['metadata'] ?? {}) as Record<string, unknown>
+      const spec = (item['spec'] ?? {}) as Record<string, unknown>
       const statusObj = (item['status'] ?? {}) as Record<string, unknown>
 
       const name = meta['name'] as string
       const namespace = meta['namespace'] as string
+      const nodeName = (spec['nodeName'] as string) ?? ''
       const labels = (meta['labels'] ?? {}) as Record<string, string>
       const phase = (statusObj['phase'] as string) || 'Unknown'
       const containerStatuses = (statusObj['containerStatuses'] ?? []) as Record<string, unknown>[]
@@ -207,6 +209,7 @@ export function parsePodTopAndGet(topStdout: string, getPodsJson: string): PodMe
       pods.push({
         name,
         namespace,
+        nodeName,
         cpuCores,
         memoryMi,
         status,

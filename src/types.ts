@@ -11,6 +11,7 @@ export interface NodeMetric {
 export interface PodMetric {
   name: string
   namespace: string
+  nodeName: string       // which node this pod runs on
   cpuCores: number       // actual cores used
   memoryMi: number       // MiB used
   status: string         // "Running", "CrashLoopBackOff", etc.

@@ -79,9 +79,15 @@ export function useKeyboard() {
     // Panel navigation
     if (ui.focusedPanel === 'nodes') {
       if (key.upArrow || input === 'k') {
-        nodes.setSelectedIndex(Math.max(0, nodes.selectedIndex - 1))
+        const newIdx = Math.max(0, nodes.selectedIndex - 1)
+        nodes.setSelectedIndex(newIdx)
+        const selectedNode = nodes.nodes[newIdx]
+        pods.setNodeFilter(selectedNode?.name ?? '')
       } else if (key.downArrow || input === 'j') {
-        nodes.setSelectedIndex(Math.min(nodes.nodes.length - 1, nodes.selectedIndex + 1))
+        const newIdx = Math.min(nodes.nodes.length - 1, nodes.selectedIndex + 1)
+        nodes.setSelectedIndex(newIdx)
+        const selectedNode = nodes.nodes[newIdx]
+        pods.setNodeFilter(selectedNode?.name ?? '')
       } else if (key.return || input === '\t') {
         ui.setFocusedPanel('pods')
       }

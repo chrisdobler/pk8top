@@ -8,6 +8,7 @@ import type { PodMetric } from '../../src/types.js'
 const regularPod: PodMetric = {
   name: 'frontend-abc',
   namespace: 'default',
+  nodeName: 'node-1',
   cpuCores: 0.1,
   memoryMi: 128,
   status: 'Running',

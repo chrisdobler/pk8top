@@ -1,5 +1,5 @@
 import React from 'react'
-import { Box, Text } from 'ink'
+import { Box, Text, useStdout } from 'ink'
 import TextInput from 'ink-text-input'
 import { usePodsStore } from '../store/pods.js'
 import { useUiStore } from '../store/ui.js'
@@ -9,6 +9,9 @@ interface Props {
   windowSize?: number
 }
 
+// Fixed-width columns: CPU(10) + Memory(10) + Status(18) + Restarts(10) + Node(30) = 78
+const FIXED_COLS = 78
+
 export default function PodsPanel({ windowSize = 20 }: Props) {
   const filteredPods = usePodsStore((s) => s.filteredPods)
   const selectedIndex = usePodsStore((s) => s.selectedIndex)
@@ -17,7 +20,10 @@ export default function PodsPanel({ windowSize = 20 }: Props) {
   const filterText = usePodsStore((s) => s.filterText)
   const setFilterText = usePodsStore((s) => s.setFilterText)
   const sortMode = usePodsStore((s) => s.sortMode)
+  const nodeFilter = usePodsStore((s) => s.nodeFilter)
   const focusedPanel = useUiStore((s) => s.focusedPanel)
+  const { stdout } = useStdout()
+  const termWidth = stdout?.columns ?? 120
 
   // Auto-scroll to keep selected index visible
   let windowStart = scrollOffset
@@ -26,20 +32,28 @@ export default function PodsPanel({ windowSize = 20 }: Props) {
   windowStart = Math.max(0, windowStart)
   const windowedPods = filteredPods.slice(windowStart, windowStart + windowSize)
 
-  // Compute column widths from visible data
-  const nsW = Math.max(12, ...windowedPods.map((p) => p.namespace.length)) + 4
-  const podW = Math.max(6, ...windowedPods.map((p) => p.name.length)) + 2
+  // Compute column widths from visible data, capped to terminal
+  const available = termWidth - 4 - FIXED_COLS  // border(2) + paddingX(2) = 4
+  const maxNs = Math.max(12, ...windowedPods.map((p) => p.namespace.length)) + 4
+  const maxPod = Math.max(6, ...windowedPods.map((p) => p.name.length)) + 2
+  const nsW = Math.min(maxNs, Math.floor(available * 0.35))
+  const podW = Math.min(maxPod, available - nsW)
+
+  const title = nodeFilter
+    ? ` Pods on ${nodeFilter} by ${sortMode.charAt(0).toUpperCase() + sortMode.slice(1)} • ${filteredPods.length} pods`
+    : ` Top Pods by ${sortMode.charAt(0).toUpperCase() + sortMode.slice(1)} • ${filteredPods.length} pods`
 
   return (
     <Box borderStyle="round" flexDirection="column" paddingX={1} width="100%">
-      <Text bold> Top Pods by {sortMode.charAt(0).toUpperCase() + sortMode.slice(1)} • {filteredPods.length} pods</Text>
-      <Box>
+      <Text bold>{title}</Text>
+      <Box overflowX="hidden">
         <Box width={nsW}><Text bold>  Namespace</Text></Box>
         <Box width={podW}><Text bold>Pod</Text></Box>
         <Box width={10}><Text bold>CPU</Text></Box>
         <Box width={10}><Text bold>Memory</Text></Box>
         <Box width={18}><Text bold>Status</Text></Box>
         <Box width={10}><Text bold>Restarts</Text></Box>
+        <Box width={30}><Text bold>Node</Text></Box>
       </Box>
 
       {windowedPods.length === 0 && (
@@ -58,21 +72,22 @@ export default function PodsPanel({ windowSize = 20 }: Props) {
           : 'red'
 
         return (
-          <Box key={`${pod.namespace}/${pod.name}/${i}`}>
+          <Box key={`${pod.namespace}/${pod.name}/${i}`} overflowX="hidden">
             <Box width={nsW}>
-              <Text bold={isSelected} backgroundColor={isSelected ? 'blue' : undefined}>
+              <Text bold={isSelected} backgroundColor={isSelected ? 'blue' : undefined} wrap="truncate">
                 {'  '}{pod.namespace}
               </Text>
             </Box>
             <Box width={podW}>
-              <Text bold={isSelected} backgroundColor={isSelected ? 'blue' : undefined}>
+              <Text bold={isSelected} backgroundColor={isSelected ? 'blue' : undefined} wrap="truncate">
                 {pod.name}
               </Text>
             </Box>
             <Box width={10}><Text>{(pod.cpuCores * 1000).toFixed(0)}m</Text></Box>
             <Box width={10}><Text>{pod.memoryMi.toFixed(0)}Mi</Text></Box>
-            <Box width={18}><Text color={statusColor}>{pod.status.slice(0, 17)}</Text></Box>
+            <Box width={18}><Text color={statusColor} wrap="truncate">{pod.status}</Text></Box>
             <Box width={10}><Text>{formatRestartAge(pod.lastRestartAgeSeconds)}</Text></Box>
+            <Box width={30}><Text dimColor wrap="truncate">{pod.nodeName}</Text></Box>
           </Box>
         )
       })}
