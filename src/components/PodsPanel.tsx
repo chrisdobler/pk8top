@@ -9,8 +9,8 @@ interface Props {
   windowSize?: number
 }
 
-// Fixed-width columns: CPU(10) + Memory(10) + Status(18) + Restarts(10) + Node(30) = 78
-const FIXED_COLS = 78
+// Fixed-width columns: CPU(10) + Memory(10) + Status(18) + Restarts(10) = 48
+const FIXED_COLS = 48
 
 export default function PodsPanel({ windowSize = 20 }: Props) {
   const filteredPods = usePodsStore((s) => s.filteredPods)
@@ -32,12 +32,24 @@ export default function PodsPanel({ windowSize = 20 }: Props) {
   windowStart = Math.max(0, windowStart)
   const windowedPods = filteredPods.slice(windowStart, windowStart + windowSize)
 
-  // Compute column widths from visible data, capped to terminal
-  const available = termWidth - 4 - FIXED_COLS  // border(2) + paddingX(2) = 4
+  // Compute variable column widths, capped to terminal
+  const innerWidth = termWidth - 4  // border(2) + paddingX(2)
+  const budget = innerWidth - FIXED_COLS
+
   const maxNs = Math.max(12, ...windowedPods.map((p) => p.namespace.length)) + 4
   const maxPod = Math.max(6, ...windowedPods.map((p) => p.name.length)) + 2
-  const nsW = Math.min(maxNs, Math.floor(available * 0.35))
-  const podW = Math.min(maxPod, available - nsW)
+  const maxNode = Math.max(6, ...windowedPods.map((p) => p.nodeName.length)) + 2
+
+  let nsW: number, podW: number, nodeW: number
+  if (maxNs + maxPod + maxNode <= budget) {
+    nsW = maxNs
+    podW = maxPod
+    nodeW = maxNode
+  } else {
+    nsW = Math.max(10, Math.floor(budget * 0.25))
+    podW = Math.max(10, Math.floor(budget * 0.45))
+    nodeW = Math.max(8, budget - nsW - podW)
+  }
 
   const title = nodeFilter
     ? ` Pods on ${nodeFilter} by ${sortMode.charAt(0).toUpperCase() + sortMode.slice(1)} • ${filteredPods.length} pods`
@@ -53,7 +65,7 @@ export default function PodsPanel({ windowSize = 20 }: Props) {
         <Box width={10}><Text bold>Memory</Text></Box>
         <Box width={18}><Text bold>Status</Text></Box>
         <Box width={10}><Text bold>Restarts</Text></Box>
-        <Box width={30}><Text bold>Node</Text></Box>
+        <Box width={nodeW}><Text bold>Node</Text></Box>
       </Box>
 
       {windowedPods.length === 0 && (
@@ -87,7 +99,7 @@ export default function PodsPanel({ windowSize = 20 }: Props) {
             <Box width={10}><Text>{pod.memoryMi.toFixed(0)}Mi</Text></Box>
             <Box width={18}><Text color={statusColor} wrap="truncate">{pod.status}</Text></Box>
             <Box width={10}><Text>{formatRestartAge(pod.lastRestartAgeSeconds)}</Text></Box>
-            <Box width={30}><Text dimColor wrap="truncate">{pod.nodeName}</Text></Box>
+            <Box width={nodeW}><Text dimColor wrap="truncate">{pod.nodeName}</Text></Box>
           </Box>
         )
       })}
