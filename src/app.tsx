@@ -15,13 +15,13 @@ interface Props {
   config: AppConfig
 }
 
-// Panel heights (including borders):
-// TrendPanel: border(2) + title(1) + 3 graph rows = 6
-// NodesPanel: border(2) + title(1) + header(1) + nodeCount
-// ControlsBar: border(2) + content(1) = 3
-const TREND_HEIGHT = 6
-const NODES_OVERHEAD = 4 // border + title + header
-const CONTROLS_HEIGHT = 3
+// Panel heights (including borders + 1 row safety buffer each):
+// TrendPanel: border(2) + title(1) + 3 graph rows + buffer = 7
+// NodesPanel: border(2) + title(1) + header(1) + nodeCount + buffer = 5 + nodeCount
+// ControlsBar: border(2) + content(1-2 with error) + buffer = 5
+const TREND_HEIGHT = 7
+const NODES_OVERHEAD = 5
+const CONTROLS_HEIGHT = 5
 
 export default function App({ config }: Props) {
   const { stdout } = useStdout()
