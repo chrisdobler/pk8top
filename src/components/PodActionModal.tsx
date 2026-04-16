@@ -21,16 +21,13 @@ export default function PodActionModal() {
       <Text bold>{pod.name}</Text>
       <Text dimColor>{pod.namespace}</Text>
       {pod.isVcluster && <Text color="magenta">⎈ vCluster pod</Text>}
-      <Box marginTop={1} flexDirection="column">
-        {actions.map((action, i) => (
-          <Box key={action}>
-            <Text bold={i === selectedAction} color={i === selectedAction ? 'cyan' : undefined} backgroundColor={i === selectedAction ? 'blue' : undefined}>
-              {i === selectedAction ? '▶ ' : '  '}
-              {action}
-            </Text>
-          </Box>
-        ))}
-      </Box>
+      <Text>{' '}</Text>
+      {actions.map((action, i) => (
+        <Text key={action} bold={i === selectedAction} color={i === selectedAction ? 'cyan' : undefined} inverse={i === selectedAction}>
+          {i === selectedAction ? '▶ ' : '  '}
+          {action}
+        </Text>
+      ))}
     </Box>
   )
 }

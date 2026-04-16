@@ -7,6 +7,7 @@ import { useUiStore } from '../store/ui.js'
 
 export function useMetricsFetcher(intervalSeconds: number) {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const seededRef = useRef(false)
 
   useEffect(() => {
     function fetchAll() {
@@ -39,6 +40,13 @@ export function useMetricsFetcher(intervalSeconds: number) {
 
         useNodesStore.getState().setNodes(nodes)
         useNodesStore.getState().pushHistory(historyData)
+
+        // On first successful fetch, seed history so the graph starts full
+        if (!seededRef.current && Object.keys(historyData).length > 0) {
+          seededRef.current = true
+          useNodesStore.getState().seedHistory(historyData, 500)
+        }
+
         usePodsStore.getState().setPods(pods)
       } catch (e) {
         useUiStore.getState().setLastError(String(e))

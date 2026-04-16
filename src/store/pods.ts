@@ -33,6 +33,22 @@ function applyFilterAndSort(
   })
 }
 
+// Pending async refilter timer — lets us debounce rapid node scrolling
+let refilterTimer: ReturnType<typeof setTimeout> | null = null
+
+function scheduleRefilter() {
+  if (refilterTimer) clearTimeout(refilterTimer)
+  refilterTimer = setTimeout(() => {
+    refilterTimer = null
+    const s = usePodsStore.getState()
+    usePodsStore.setState({
+      filteredPods: applyFilterAndSort(s.pods, s.filterText, s.sortMode, s.nodeFilter),
+      selectedIndex: 0,
+      scrollOffset: 0,
+    })
+  }, 0)
+}
+
 interface PodsState {
   pods: PodMetric[]
   filteredPods: PodMetric[]
@@ -64,7 +80,12 @@ export const usePodsStore = create<PodsState>((set) => ({
   setFilterText: (filterText) => set((s) => ({ filterText, filteredPods: applyFilterAndSort(s.pods, filterText, s.sortMode, s.nodeFilter), selectedIndex: 0, scrollOffset: 0 })),
   setShowFilter: (showFilter) => set({ showFilter }),
   setSortMode: (sortMode) => set((s) => ({ sortMode, filteredPods: applyFilterAndSort(s.pods, s.filterText, sortMode, s.nodeFilter) })),
-  setNodeFilter: (nodeFilter) => set((s) => ({ nodeFilter, filteredPods: applyFilterAndSort(s.pods, s.filterText, s.sortMode, nodeFilter), selectedIndex: 0, scrollOffset: 0 })),
+  setNodeFilter: (nodeFilter) => {
+    // Update the filter value immediately so the nodes panel re-renders instantly,
+    // but defer the expensive filter+sort to the next tick so scrolling stays snappy.
+    set({ nodeFilter })
+    scheduleRefilter()
+  },
   setSelectedIndex: (selectedIndex) => set({ selectedIndex }),
   setScrollOffset: (scrollOffset) => set({ scrollOffset }),
 }))

@@ -5,8 +5,6 @@ import { useUiStore } from '../store/ui.js'
 import { createCpuBarChars } from '../lib/parsers.js'
 
 const BAR_WIDTH = 20
-// Fixed-width portion: indent(2) + Status(10) + CPU%(8) + gap(2) + BAR(20) + Mem%(8) = 50
-const FIXED = 2 + 10 + 8 + 2 + BAR_WIDTH + 8
 
 function pad(s: string, w: number): string {
   return s.length >= w ? s.slice(0, w - 1) + '…' : s.padEnd(w)
@@ -14,6 +12,24 @@ function pad(s: string, w: number): string {
 
 function rpad(s: string, w: number): string {
   return s.padStart(w).slice(0, w)
+}
+
+function cpuPctColor(pct: number): 'red' | 'yellow' | 'green' {
+  if (pct > 80) return 'red'
+  if (pct > 50) return 'yellow'
+  return 'green'
+}
+
+function topBorder(widths: number[]): string {
+  return '┏' + widths.map((w) => '━'.repeat(w + 2)).join('┳') + '┓'
+}
+
+function headerSep(widths: number[]): string {
+  return '┡' + widths.map((w) => '━'.repeat(w + 2)).join('╇') + '┩'
+}
+
+function bottomBorder(widths: number[]): string {
+  return '└' + widths.map((w) => '─'.repeat(w + 2)).join('┴') + '┘'
 }
 
 export default function NodesPanel() {
@@ -31,49 +47,99 @@ export default function NodesPanel() {
     )
   }
 
-  const innerWidth = termWidth - 4
-  const budget = innerWidth - FIXED
+  // 8 columns matching Python: Node, Roles, Status, CPU (cores), CPU %, CPU bar, Mem (Mi), Mem %
+  const NUM_COLS = 8
+  const innerWidth = termWidth - 4 // Box border + paddingX
+  const borderOverhead = (NUM_COLS + 1) + (2 * NUM_COLS) // 9 + 16 = 25
 
-  const maxName = Math.max(6, ...nodes.map((n) => n.name.length)) + 2
-  const maxRole = Math.max(6, ...nodes.map((n) => n.role.length)) + 2
+  // Fixed column widths matching Python: Status(10) + CPU cores(10) + CPU%(7) + bar(20) + Mem Mi(10) + Mem%(7) = 64
+  const fixedCols = 10 + 10 + 7 + BAR_WIDTH + 10 + 7
+  const budget = innerWidth - borderOverhead - fixedCols
 
-  let nameW: number, roleW: number
-  if (maxName + maxRole <= budget) {
-    nameW = maxName
-    roleW = maxRole
+  // Start with content-fit minimums
+  const minName = Math.max(6, ...nodes.map((n) => n.name.length))
+  const minRole = Math.max(6, ...nodes.map((n) => n.role.length))
+
+  // Expand to fill full width (like Rich expand=True), favoring Node column
+  const remaining = budget - minName - minRole
+  let nameW = minName
+  let roleW = minRole
+  if (remaining > 0) {
+    const nameExtra = Math.floor(remaining * 0.6)
+    nameW += nameExtra
+    roleW += remaining - nameExtra
   } else {
     nameW = Math.max(10, Math.floor(budget * 0.55))
     roleW = Math.max(8, budget - nameW)
   }
 
-  const mkRow = (name: string, role: string, status: string, cpu: string, bar: string, mem: string) =>
-    '  ' + pad(name, nameW) + pad(role, roleW) + pad(status, 10) + rpad(cpu, 8) + '  ' + bar.padEnd(BAR_WIDTH) + rpad(mem, 8)
+  const widths = [nameW, roleW, 10, 10, 7, BAR_WIDTH, 10, 7]
+
+  // Aggregate stats for "All Nodes"
+  const totalCores = nodes.reduce((sum, n) => sum + n.cpuCores, 0)
+  const avgCpu = nodes.reduce((sum, n) => sum + n.cpuPercent, 0) / nodes.length
+  const totalMem = nodes.reduce((sum, n) => sum + n.memoryMi, 0)
+  const avgMem = nodes.reduce((sum, n) => sum + n.memoryPercent, 0) / nodes.length
+  const allBar = createCpuBarChars(avgCpu, BAR_WIDTH)
+  const allSelected = selectedIndex === 0 && focusedPanel === 'nodes'
 
   return (
     <Box borderStyle="round" flexDirection="column" paddingX={1} width={termWidth}>
       <Text bold> Kubernetes Node Metrics</Text>
-      <Text bold>{mkRow('Node', 'Roles', 'Status', 'CPU%', 'CPU', 'Mem%')}</Text>
+      <Text>{topBorder(widths)}</Text>
+      <Text bold color="cyan">
+        {'┃ ' + pad('Node', nameW) + ' ┃ ' + pad('Roles', roleW) + ' ┃ ' + pad('Status', 10) + ' ┃ ' + rpad('CPU (cores)', 10) + ' ┃ ' + rpad('CPU %', 7) + ' ┃ ' + 'CPU'.padEnd(BAR_WIDTH) + ' ┃ ' + rpad('Mem (Mi)', 10) + ' ┃ ' + rpad('Mem %', 7) + ' ┃'}
+      </Text>
+      <Text>{headerSep(widths)}</Text>
+      <Text bold={allSelected} inverse={allSelected}>
+        {'│ '}
+        <Text color="cyan">{pad('all', nameW)}</Text>
+        {' │ '}
+        <Text color="cyan">{pad('-', roleW)}</Text>
+        {' │ '}
+        <Text color="cyan">{pad('-', 10)}</Text>
+        {' │ '}
+        <Text color="magenta">{rpad(totalCores.toFixed(2), 10)}</Text>
+        {' │ '}
+        <Text color={cpuPctColor(avgCpu)}>{rpad(avgCpu.toFixed(1), 7)}</Text>
+        {' │ '}
+        <Text color={allBar.color}>{allBar.text.padEnd(BAR_WIDTH)}</Text>
+        {' │ '}
+        <Text color="green">{rpad(totalMem.toFixed(0), 10)}</Text>
+        {' │ '}
+        <Text color="green">{rpad(avgMem.toFixed(1), 7)}</Text>
+        {' │'}
+      </Text>
       {nodes.map((node, i) => {
-        const isSelected = i === selectedIndex && focusedPanel === 'nodes'
+        const isSelected = (i + 1) === selectedIndex && focusedPanel === 'nodes'
         const bar = createCpuBarChars(node.cpuPercent, BAR_WIDTH)
-        const line = mkRow(
-          node.name,
-          node.role,
-          node.status,
-          node.cpuPercent.toFixed(1) + '%',
-          bar.text,
-          node.memoryPercent.toFixed(1) + '%',
-        )
         return (
           <Text
             key={node.name}
             bold={isSelected}
-            backgroundColor={isSelected ? 'blue' : undefined}
+            inverse={isSelected}
           >
-            {line}
+            {'│ '}
+            <Text color="cyan">{pad(node.name, nameW)}</Text>
+            {' │ '}
+            <Text color="cyan">{pad(node.role, roleW)}</Text>
+            {' │ '}
+            <Text color="cyan">{pad(node.status, 10)}</Text>
+            {' │ '}
+            <Text color="magenta">{rpad(node.cpuCores.toFixed(2), 10)}</Text>
+            {' │ '}
+            <Text color={cpuPctColor(node.cpuPercent)}>{rpad(node.cpuPercent.toFixed(1), 7)}</Text>
+            {' │ '}
+            <Text color={bar.color}>{bar.text.padEnd(BAR_WIDTH)}</Text>
+            {' │ '}
+            <Text color="green">{rpad(node.memoryMi.toFixed(0), 10)}</Text>
+            {' │ '}
+            <Text color="green">{rpad(node.memoryPercent.toFixed(1), 7)}</Text>
+            {' │'}
           </Text>
         )
       })}
+      <Text>{bottomBorder(widths)}</Text>
     </Box>
   )
 }

@@ -81,13 +81,20 @@ export function useKeyboard() {
       if (key.upArrow || input === 'k') {
         const newIdx = Math.max(0, nodes.selectedIndex - 1)
         nodes.setSelectedIndex(newIdx)
-        const selectedNode = nodes.nodes[newIdx]
-        pods.setNodeFilter(selectedNode?.name ?? '')
+        // Index 0 = "All Nodes" (show all pods), 1+ = specific node
+        if (newIdx === 0) {
+          pods.setNodeFilter('')
+        } else {
+          pods.setNodeFilter(nodes.nodes[newIdx - 1]?.name ?? '')
+        }
       } else if (key.downArrow || input === 'j') {
-        const newIdx = Math.min(nodes.nodes.length - 1, nodes.selectedIndex + 1)
+        const newIdx = Math.min(nodes.nodes.length, nodes.selectedIndex + 1)
         nodes.setSelectedIndex(newIdx)
-        const selectedNode = nodes.nodes[newIdx]
-        pods.setNodeFilter(selectedNode?.name ?? '')
+        if (newIdx === 0) {
+          pods.setNodeFilter('')
+        } else {
+          pods.setNodeFilter(nodes.nodes[newIdx - 1]?.name ?? '')
+        }
       } else if (key.return || input === '\t') {
         ui.setFocusedPanel('pods')
       }
