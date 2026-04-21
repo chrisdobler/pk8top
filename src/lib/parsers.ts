@@ -111,6 +111,7 @@ function parseNodeMeta(getNodesJson: string): Record<string, NodeMeta> {
 export function parseNodeMetrics(topStdout: string, getNodesJson: string): NodeMetric[] {
   const nodeMeta = parseNodeMeta(getNodesJson)
   const nodes: NodeMetric[] = []
+  const seenNodes = new Set<string>()
 
   for (const line of topStdout.trim().split('\n')) {
     if (!line.trim()) continue
@@ -137,8 +138,17 @@ export function parseNodeMetrics(topStdout: string, getNodesJson: string): NodeM
     const memoryPercent = pctIndices[1] !== undefined ? parseFloat(tokens[pctIndices[1]]) || 0 : 0
     const meta = nodeMeta[name] ?? { role: 'worker', status: 'Ready' as const }
 
+    seenNodes.add(name)
     nodes.push({ name, cpuCores, cpuPercent, memoryMi, memoryPercent, ...meta })
   }
+
+  // Include nodes not in kubectl top output (e.g. NotReady nodes) with zeroed metrics
+  for (const [name, meta] of Object.entries(nodeMeta)) {
+    if (!seenNodes.has(name)) {
+      nodes.push({ name, cpuCores: 0, cpuPercent: 0, memoryMi: 0, memoryPercent: 0, ...meta })
+    }
+  }
+
   return nodes
 }
 

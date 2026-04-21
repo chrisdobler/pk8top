@@ -2,7 +2,8 @@ import { useInput } from 'ink'
 import { useNodesStore } from '../store/nodes.js'
 import { usePodsStore } from '../store/pods.js'
 import { useUiStore } from '../store/ui.js'
-import { podLogs, podDescribe, podDelete, listNamespaceResources, vclusterConnect, vclusterDisconnect } from '../lib/kubectl.js'
+import { podLogs, podDescribe, podDelete, listNamespaceResources, vclusterConnect } from '../lib/kubectl.js'
+import { showActionModal, showFullScreenViewer } from '../lib/outputViewer.js'
 
 const SORT_MODES = ['cpu', 'memory', 'status', 'namespace', 'restarts'] as const
 
@@ -20,45 +21,6 @@ export function useKeyboard() {
     // ESC: priority chain
     if (key.escape) {
       ui.handleEsc()
-      return
-    }
-
-    // Modal navigation
-    if (ui.showModal && ui.selectedPodForModal) {
-      const pod = ui.selectedPodForModal
-      const actions = pod.isVcluster
-        ? ['Describe', 'Logs', 'List Namespace', 'Connect to vCluster', 'Delete', 'Cancel']
-        : ['Describe', 'Logs', 'List Namespace', 'Delete', 'Cancel']
-
-      if (key.upArrow || input === 'k') {
-        ui.setSelectedModalAction(Math.max(0, ui.selectedModalAction - 1))
-        return
-      }
-      if (key.downArrow || input === 'j') {
-        ui.setSelectedModalAction(Math.min(actions.length - 1, ui.selectedModalAction + 1))
-        return
-      }
-      if (key.return) {
-        const action = actions[ui.selectedModalAction]
-        ui.setShowModal(false)
-        if (action === 'Cancel') return
-        if (action === 'Describe') {
-          const out = podDescribe(pod.name, pod.namespace)
-          ui.setLastError(out.slice(0, 200))
-        } else if (action === 'Logs') {
-          const out = podLogs(pod.name, pod.namespace)
-          ui.setLastError(out.slice(0, 200))
-        } else if (action === 'Delete') {
-          podDelete(pod.name, pod.namespace)
-        } else if (action === 'List Namespace') {
-          const out = listNamespaceResources(pod.namespace)
-          ui.setLastError(out.slice(0, 200))
-        } else if (action === 'Connect to vCluster') {
-          const ok = vclusterConnect(pod.name, pod.namespace)
-          ui.setVclusterConnected(ok)
-        }
-        return
-      }
       return
     }
 
@@ -81,7 +43,6 @@ export function useKeyboard() {
       if (key.upArrow || input === 'k') {
         const newIdx = Math.max(0, nodes.selectedIndex - 1)
         nodes.setSelectedIndex(newIdx)
-        // Index 0 = "All Nodes" (show all pods), 1+ = specific node
         if (newIdx === 0) {
           pods.setNodeFilter('')
         } else {
@@ -112,7 +73,31 @@ export function useKeyboard() {
         pods.setSortMode(SORT_MODES[idx])
       } else if (key.return) {
         const pod = pods.filteredPods[pods.selectedIndex]
-        if (pod) ui.setShowModal(true, pod)
+        if (!pod) return
+
+        // Show ANSI modal — blocks until user picks or cancels
+        const actions = pod.isVcluster
+          ? ['Describe', 'Logs', 'List Namespace Resources', 'Connect to vCluster', 'Delete', 'Cancel']
+          : ['Describe', 'Logs', 'List Namespace Resources', 'Delete', 'Cancel']
+
+        const action = showActionModal(pod.name, pod.namespace, actions)
+        if (!action || action === 'Cancel') return
+
+        if (action === 'Describe') {
+          const out = podDescribe(pod.name, pod.namespace)
+          showFullScreenViewer(`Describe: ${pod.namespace}/${pod.name}`, out)
+        } else if (action === 'Logs') {
+          const out = podLogs(pod.name, pod.namespace)
+          showFullScreenViewer(`Logs: ${pod.namespace}/${pod.name}`, out)
+        } else if (action === 'Delete') {
+          podDelete(pod.name, pod.namespace)
+        } else if (action === 'List Namespace Resources') {
+          const out = listNamespaceResources(pod.namespace)
+          showFullScreenViewer(`Resources in ${pod.namespace}`, out)
+        } else if (action === 'Connect to vCluster') {
+          const ok = vclusterConnect(pod.name, pod.namespace)
+          ui.setVclusterConnected(ok)
+        }
       }
     }
   })

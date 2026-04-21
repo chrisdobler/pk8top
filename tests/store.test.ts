@@ -30,9 +30,6 @@ beforeEach(() => {
   })
   useUiStore.setState({
     focusedPanel: 'nodes',
-    showModal: false,
-    selectedModalAction: 0,
-    selectedPodForModal: null,
     isVcluster: false,
     vclusterConnected: false,
     lastError: null,
@@ -46,12 +43,12 @@ describe('nodesStore', () => {
     expect(useNodesStore.getState().nodes).toHaveLength(1)
   })
 
-  it('pushes CPU history and caps at 60', () => {
+  it('pushes CPU history and caps at 500', () => {
     const { pushHistory } = useNodesStore.getState()
-    for (let i = 0; i < 65; i++) pushHistory({ all: i })
+    for (let i = 0; i < 505; i++) pushHistory({ all: i })
     const history = useNodesStore.getState().history['all']!
-    expect(history).toHaveLength(60)
-    expect(history[59]).toBe(64)
+    expect(history).toHaveLength(500)
+    expect(history[499]).toBe(504)
   })
 
   it('aggregates multiple nodes in history', () => {
@@ -141,23 +138,15 @@ describe('podsStore — sorting', () => {
 })
 
 describe('uiStore — ESC chain', () => {
-  it('closes modal first', () => {
-    useUiStore.setState({ showModal: true, focusedPanel: 'pods' } as never)
-    useUiStore.getState().handleEsc()
-    const s = useUiStore.getState()
-    expect(s.showModal).toBe(false)
-    expect(s.focusedPanel).toBe('pods')
-  })
-
-  it('clears filter second (when no modal)', () => {
+  it('clears filter first', () => {
     usePodsStore.setState({ showFilter: true, filterText: 'abc' } as never)
     useUiStore.getState().handleEsc()
     expect(usePodsStore.getState().showFilter).toBe(false)
     expect(usePodsStore.getState().filterText).toBe('')
   })
 
-  it('switches focus to nodes third (when in pods, no modal, no filter)', () => {
-    useUiStore.setState({ focusedPanel: 'pods', showModal: false } as never)
+  it('switches focus to nodes second (when in pods, no filter)', () => {
+    useUiStore.setState({ focusedPanel: 'pods' } as never)
     useUiStore.getState().handleEsc()
     expect(useUiStore.getState().focusedPanel).toBe('nodes')
   })

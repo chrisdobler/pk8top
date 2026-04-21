@@ -134,8 +134,14 @@ describe('parseNodeMetrics', () => {
     expect(nodes[0].status).toBe('Ready')
     expect(nodes[1].status).toBe('NotReady')
   })
-  it('returns empty array on empty input', () => {
-    expect(parseNodeMetrics('', NODE_GET_JSON)).toHaveLength(0)
+  it('returns only metadata nodes when top output is empty', () => {
+    const nodes = parseNodeMetrics('', NODE_GET_JSON)
+    // Nodes from getNodes are still included with zeroed metrics
+    expect(nodes.length).toBeGreaterThan(0)
+    expect(nodes.every((n) => n.cpuCores === 0 && n.cpuPercent === 0)).toBe(true)
+  })
+  it('returns empty array on fully empty input', () => {
+    expect(parseNodeMetrics('', '{}')).toHaveLength(0)
   })
 })
 
