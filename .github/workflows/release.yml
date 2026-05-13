@@ -1,0 +1,133 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: macos-14
+            target: darwin-arm64
+          - os: macos-13
+            target: darwin-x64
+          - os: ubuntu-latest
+            target: linux-x64
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - run: bun install
+
+      - run: bun build src/index.tsx --compile --outfile pk8top --external react-devtools-core
+
+      - run: tar -czf pk8top-${{ matrix.target }}.tar.gz pk8top
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pk8top-${{ matrix.target }}
+          path: pk8top-${{ matrix.target }}.tar.gz
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: pk8top-*.tar.gz
+          generate_release_notes: true
+
+  update-tap:
+    needs: release
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+
+      - name: Render formula
+        id: render
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          SHA_DARWIN_ARM64=$(shasum -a 256 pk8top-darwin-arm64.tar.gz | awk '{print $1}')
+          SHA_DARWIN_X64=$(shasum -a 256 pk8top-darwin-x64.tar.gz | awk '{print $1}')
+          SHA_LINUX_X64=$(shasum -a 256 pk8top-linux-x64.tar.gz | awk '{print $1}')
+
+          mkdir -p rendered/Formula
+          cat > rendered/Formula/pk8top.rb <<EOF
+          class Pk8top < Formula
+            desc "Terminal UI for monitoring Kubernetes cluster resources"
+            homepage "https://github.com/chrisdobler/pk8top"
+            version "${VERSION}"
+            license "MIT"
+
+            depends_on "kubernetes-cli"
+
+            on_macos do
+              on_arm do
+                url "https://github.com/chrisdobler/pk8top/releases/download/v${VERSION}/pk8top-darwin-arm64.tar.gz"
+                sha256 "${SHA_DARWIN_ARM64}"
+              end
+              on_intel do
+                url "https://github.com/chrisdobler/pk8top/releases/download/v${VERSION}/pk8top-darwin-x64.tar.gz"
+                sha256 "${SHA_DARWIN_X64}"
+              end
+            end
+
+            on_linux do
+              on_intel do
+                url "https://github.com/chrisdobler/pk8top/releases/download/v${VERSION}/pk8top-linux-x64.tar.gz"
+                sha256 "${SHA_LINUX_X64}"
+              end
+            end
+
+            def install
+              bin.install "pk8top"
+            end
+
+            test do
+              assert_match "Usage", shell_output("#{bin}/pk8top --help")
+            end
+          end
+          EOF
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v4
+        with:
+          repository: chrisdobler/homebrew-pk8top
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          path: tap
+
+      - name: Commit and push updated formula
+        run: |
+          set -euo pipefail
+          cp rendered/Formula/pk8top.rb tap/Formula/pk8top.rb
+          cd tap
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Formula/pk8top.rb
+          if git diff --staged --quiet; then
+            echo "No changes to formula; nothing to commit."
+          else
+            git commit -m "pk8top ${{ steps.render.outputs.version }}"
+            git push
+          fi
