@@ -214,3 +214,7 @@ node_modules/
 
 # Superpowers
 .superpowers/
+docs/superpowers/
+
+# Compiled binary
+/pk8top
