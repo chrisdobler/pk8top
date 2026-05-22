@@ -28,7 +28,7 @@ jobs:
 
       - run: bun install
 
-      - run: bun build src/index.tsx --compile --target=bun-${{ matrix.target }} --outfile pk8top --external react-devtools-core
+      - run: bun build src/index.tsx --compile --target=bun-${{ matrix.target }} --outfile pk8top
 
       - run: tar -czf pk8top-${{ matrix.target }}.tar.gz pk8top
 
