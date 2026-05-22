@@ -10,17 +10,14 @@ permissions:
 
 jobs:
   build:
+    runs-on: ubuntu-latest
+
     strategy:
       matrix:
-        include:
-          - os: macos-14
-            target: darwin-arm64
-          - os: macos-13
-            target: darwin-x64
-          - os: ubuntu-latest
-            target: linux-x64
-
-    runs-on: ${{ matrix.os }}
+        target:
+          - darwin-arm64
+          - darwin-x64
+          - linux-x64
 
     steps:
       - uses: actions/checkout@v4
@@ -31,7 +28,7 @@ jobs:
 
       - run: bun install
 
-      - run: bun build src/index.tsx --compile --outfile pk8top --external react-devtools-core
+      - run: bun build src/index.tsx --compile --target=bun-${{ matrix.target }} --outfile pk8top --external react-devtools-core
 
       - run: tar -czf pk8top-${{ matrix.target }}.tar.gz pk8top
 
