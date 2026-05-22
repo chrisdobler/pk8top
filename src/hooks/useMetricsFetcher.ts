@@ -6,19 +6,31 @@ import { usePodsStore } from '../store/pods.js'
 import { useUiStore } from '../store/ui.js'
 
 export function useMetricsFetcher(intervalSeconds: number) {
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const seededRef = useRef(false)
 
   useEffect(() => {
-    function fetchAll() {
-      try {
-        const isVcluster = detectVcluster()
-        useUiStore.getState().setIsVcluster(isVcluster)
+    const abort = new AbortController()
+    const { signal } = abort
+    let inFlight = false
+    let cancelled = false
 
-        const nodesTopResult = topNodes()
-        const nodesJson = getNodes()
-        const podsTopResult = topPods()
-        const podsJson = getPods()
+    async function fetchAll() {
+      if (inFlight || cancelled) return
+      inFlight = true
+      try {
+        const [isVcluster, nodesTopResult, nodesJson, podsTopResult, podsJson] =
+          await Promise.all([
+            detectVcluster(signal),
+            topNodes(signal),
+            getNodes(signal),
+            topPods(signal),
+            getPods(signal),
+          ])
+
+        if (cancelled) return
+
+        useUiStore.getState().setIsVcluster(isVcluster)
 
         if (nodesTopResult.error && !nodesTopResult.stdout) {
           useUiStore.getState().setLastError(nodesTopResult.error)
@@ -49,14 +61,23 @@ export function useMetricsFetcher(intervalSeconds: number) {
 
         usePodsStore.getState().setPods(pods)
       } catch (e) {
-        useUiStore.getState().setLastError(String(e))
+        if (!cancelled) {
+          useUiStore.getState().setLastError(String(e))
+        }
+      } finally {
+        inFlight = false
+        if (!cancelled) {
+          timerRef.current = setTimeout(fetchAll, intervalSeconds * 1000)
+        }
       }
     }
 
     fetchAll()
-    timerRef.current = setInterval(fetchAll, intervalSeconds * 1000)
+
     return () => {
-      if (timerRef.current) clearInterval(timerRef.current)
+      cancelled = true
+      abort.abort()
+      if (timerRef.current) clearTimeout(timerRef.current)
     }
   }, [intervalSeconds])
 }
