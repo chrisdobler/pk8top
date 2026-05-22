@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { useNodesStore } from '../src/store/nodes.js'
 import { usePodsStore } from '../src/store/pods.js'
 import { useUiStore } from '../src/store/ui.js'
@@ -14,26 +14,6 @@ const makePod = (overrides: Partial<PodMetric> = {}): PodMetric => ({
   lastRestartAgeSeconds: Infinity,
   isVcluster: false,
   ...overrides,
-})
-
-beforeEach(() => {
-  useNodesStore.setState({ nodes: [], selectedIndex: 0, history: {} })
-  usePodsStore.setState({
-    pods: [],
-    filteredPods: [],
-    filterText: '',
-    showFilter: false,
-    sortMode: 'cpu',
-    nodeFilter: '',
-    selectedIndex: 0,
-    scrollOffset: 0,
-  })
-  useUiStore.setState({
-    focusedPanel: 'nodes',
-    isVcluster: false,
-    vclusterConnected: false,
-    lastError: null,
-  })
 })
 
 describe('nodesStore', () => {
@@ -56,6 +36,30 @@ describe('nodesStore', () => {
     const h = useNodesStore.getState().history
     expect(h['node1']).toHaveLength(1)
     expect(h['all']).toHaveLength(1)
+  })
+
+  it('seedHistory fills the history with N copies of the value', () => {
+    useNodesStore.getState().seedHistory({ all: 50 }, 10)
+    expect(useNodesStore.getState().history['all']).toHaveLength(10)
+    expect(useNodesStore.getState().history['all']!.every((v) => v === 50)).toBe(true)
+  })
+
+  it('seedHistory caps at MAX_HISTORY (500) even if asked for more', () => {
+    useNodesStore.getState().seedHistory({ all: 1 }, 9999)
+    expect(useNodesStore.getState().history['all']).toHaveLength(500)
+  })
+
+  it('seedHistory skips a key that already has more than one entry', () => {
+    useNodesStore.getState().pushHistory({ all: 10 })
+    useNodesStore.getState().pushHistory({ all: 20 })
+    useNodesStore.getState().seedHistory({ all: 99 }, 50)
+    // Should retain the two pushed values, not get replaced
+    expect(useNodesStore.getState().history['all']).toEqual([10, 20])
+  })
+
+  it('setSelectedIndex updates selectedIndex', () => {
+    useNodesStore.getState().setSelectedIndex(3)
+    expect(useNodesStore.getState().selectedIndex).toBe(3)
   })
 })
 
@@ -81,10 +85,57 @@ describe('podsStore — filtering', () => {
     expect(usePodsStore.getState().filteredPods).toHaveLength(1)
   })
 
+  it('filter is case-insensitive', () => {
+    usePodsStore.getState().setPods([makePod({ name: 'FrontEnd' })])
+    usePodsStore.getState().setFilterText('FRONT')
+    expect(usePodsStore.getState().filteredPods).toHaveLength(1)
+  })
+
   it('recomputes filteredPods when pods are replaced', () => {
     usePodsStore.getState().setFilterText('front')
     usePodsStore.getState().setPods([makePod({ name: 'frontend' })])
     expect(usePodsStore.getState().filteredPods).toHaveLength(1)
+  })
+
+  it('setNodeFilter scopes pods to the named node (after debounce)', async () => {
+    vi.useFakeTimers()
+    usePodsStore.getState().setPods([
+      makePod({ name: 'a', nodeName: 'node-1' }),
+      makePod({ name: 'b', nodeName: 'node-2' }),
+    ])
+    usePodsStore.getState().setNodeFilter('node-1')
+    // setNodeFilter schedules an async refilter; flush
+    await vi.runAllTimersAsync()
+    expect(usePodsStore.getState().filteredPods).toHaveLength(1)
+    expect(usePodsStore.getState().filteredPods[0].name).toBe('a')
+    vi.useRealTimers()
+  })
+
+  it('setNodeFilter empty string shows pods from all nodes', async () => {
+    vi.useFakeTimers()
+    usePodsStore.getState().setPods([
+      makePod({ name: 'a', nodeName: 'node-1' }),
+      makePod({ name: 'b', nodeName: 'node-2' }),
+    ])
+    usePodsStore.getState().setNodeFilter('node-1')
+    await vi.runAllTimersAsync()
+    usePodsStore.getState().setNodeFilter('')
+    await vi.runAllTimersAsync()
+    expect(usePodsStore.getState().filteredPods).toHaveLength(2)
+    vi.useRealTimers()
+  })
+
+  it('rapid setNodeFilter only refilters once (debounced)', async () => {
+    vi.useFakeTimers()
+    usePodsStore.getState().setPods([makePod({ nodeName: 'node-1' })])
+    usePodsStore.getState().setNodeFilter('node-1')
+    usePodsStore.getState().setNodeFilter('node-2')
+    usePodsStore.getState().setNodeFilter('node-3')
+    await vi.runAllTimersAsync()
+    // Only the final filter applies
+    expect(usePodsStore.getState().nodeFilter).toBe('node-3')
+    expect(usePodsStore.getState().filteredPods).toHaveLength(0)
+    vi.useRealTimers()
   })
 })
 
@@ -135,6 +186,33 @@ describe('podsStore — sorting', () => {
     expect(usePodsStore.getState().filteredPods[0].name).toBe('recent')
     expect(usePodsStore.getState().filteredPods[2].name).toBe('never')
   })
+
+  it('setFilterText resets selectedIndex and scrollOffset to 0', () => {
+    usePodsStore.setState({ selectedIndex: 5, scrollOffset: 10 } as never)
+    usePodsStore.getState().setPods([makePod({ name: 'a' }), makePod({ name: 'b' })])
+    usePodsStore.getState().setFilterText('a')
+    expect(usePodsStore.getState().selectedIndex).toBe(0)
+    expect(usePodsStore.getState().scrollOffset).toBe(0)
+  })
+})
+
+describe('podsStore — scroll and selection', () => {
+  it('setSelectedIndex updates selectedIndex', () => {
+    usePodsStore.getState().setSelectedIndex(7)
+    expect(usePodsStore.getState().selectedIndex).toBe(7)
+  })
+
+  it('setScrollOffset updates scrollOffset', () => {
+    usePodsStore.getState().setScrollOffset(25)
+    expect(usePodsStore.getState().scrollOffset).toBe(25)
+  })
+
+  it('setShowFilter toggles filter visibility', () => {
+    usePodsStore.getState().setShowFilter(true)
+    expect(usePodsStore.getState().showFilter).toBe(true)
+    usePodsStore.getState().setShowFilter(false)
+    expect(usePodsStore.getState().showFilter).toBe(false)
+  })
 })
 
 describe('uiStore — ESC chain', () => {
@@ -149,5 +227,43 @@ describe('uiStore — ESC chain', () => {
     useUiStore.setState({ focusedPanel: 'pods' } as never)
     useUiStore.getState().handleEsc()
     expect(useUiStore.getState().focusedPanel).toBe('nodes')
+  })
+
+  it('disconnects vcluster third (when nodes-focused, no filter)', () => {
+    useUiStore.setState({ focusedPanel: 'nodes', vclusterConnected: true } as never)
+    useUiStore.getState().handleEsc()
+    expect(useUiStore.getState().vclusterConnected).toBe(false)
+  })
+
+  it('exits process at the end of the chain (no filter, no pods focus, no vcluster)', () => {
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never)
+    useUiStore.setState({ focusedPanel: 'nodes', vclusterConnected: false } as never)
+    useUiStore.getState().handleEsc()
+    expect(exitSpy).toHaveBeenCalledWith(0)
+    exitSpy.mockRestore()
+  })
+})
+
+describe('uiStore — setters', () => {
+  it('setFocusedPanel switches the focused panel', () => {
+    useUiStore.getState().setFocusedPanel('pods')
+    expect(useUiStore.getState().focusedPanel).toBe('pods')
+  })
+
+  it('setIsVcluster toggles vcluster flag', () => {
+    useUiStore.getState().setIsVcluster(true)
+    expect(useUiStore.getState().isVcluster).toBe(true)
+  })
+
+  it('setVclusterConnected toggles connected flag', () => {
+    useUiStore.getState().setVclusterConnected(true)
+    expect(useUiStore.getState().vclusterConnected).toBe(true)
+  })
+
+  it('setLastError stores and clears errors', () => {
+    useUiStore.getState().setLastError('boom')
+    expect(useUiStore.getState().lastError).toBe('boom')
+    useUiStore.getState().setLastError(null)
+    expect(useUiStore.getState().lastError).toBeNull()
   })
 })

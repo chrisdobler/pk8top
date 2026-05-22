@@ -218,3 +218,6 @@ docs/superpowers/
 
 # Compiled binary
 /pk8top
+
+# Test coverage report
+coverage/

@@ -2,42 +2,17 @@
 import React from 'react'
 import { render } from 'ink'
 import App from './app.js'
-import type { AppConfig } from './types.js'
+import { parseArgs, HELP_TEXT } from './lib/cli.js'
+import { enterAltScreen, installSignalCleanup } from './lib/screen.js'
 
-function parseArgs(): AppConfig {
-  const args = process.argv.slice(2)
-  let interval = 3.3
-  let historyPoints = 60
+const result = parseArgs(process.argv.slice(2))
 
-  for (let i = 0; i < args.length; i++) {
-    if ((args[i] === '--interval' || args[i] === '-i') && args[i + 1]) {
-      interval = parseFloat(args[i + 1] ?? '3.3')
-    }
-    if ((args[i] === '--history' || args[i] === '-H') && args[i + 1]) {
-      historyPoints = parseInt(args[i + 1] ?? '60', 10)
-    }
-    if (args[i] === '--help') {
-      console.log('Usage: pk8top [--interval <seconds>] [--history <points>]')
-      console.log('  --interval, -i  Refresh interval in seconds (default: 3.3)')
-      console.log('  --history, -H   History points to keep (default: 60)')
-      process.exit(0)
-    }
-  }
-
-  return { interval, historyPoints }
+if (result.help) {
+  console.log(HELP_TEXT)
+  process.exit(0)
 }
 
-// Enter alternate screen buffer (like htop/vim)
-process.stdout.write('\x1b[?1049h')
-process.stdout.write('\x1b[?25l') // hide cursor
+enterAltScreen(process.stdout)
+installSignalCleanup(process, process.stdout)
 
-function cleanup() {
-  process.stdout.write('\x1b[?25h') // show cursor
-  process.stdout.write('\x1b[?1049l') // leave alternate screen
-}
-
-process.on('exit', cleanup)
-process.on('SIGINT', () => { cleanup(); process.exit(0) })
-process.on('SIGTERM', () => { cleanup(); process.exit(0) })
-
-render(<App config={parseArgs()} />, { exitOnCtrlC: false })
+render(<App config={result.config} />, { exitOnCtrlC: false })

@@ -9,7 +9,8 @@
     "dev": "tsx src/index.tsx",
     "build": "tsup src/index.tsx --format esm --out-dir dist --banner.js '#!/usr/bin/env node'",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "ink": "^5.2.0",
@@ -23,6 +24,7 @@
   "devDependencies": {
     "@types/node": "^22.0.0",
     "@types/react": "^18.3.0",
+    "@vitest/coverage-v8": "^2.1.9",
     "ink-testing-library": "^4.0.0",
     "react-devtools-core": "^4.28.5",
     "tsup": "^8.3.0",
