@@ -1,5 +1,5 @@
-import React from 'react'
-import { Box, useStdout } from 'ink'
+import React, { useEffect } from 'react'
+import { Box, useApp, useStdout } from 'ink'
 import TrendPanel from './components/TrendPanel.js'
 import NodesPanel from './components/NodesPanel.js'
 import PodsPanel from './components/PodsPanel.js'
@@ -8,6 +8,7 @@ import { useMetricsFetcher } from './hooks/useMetricsFetcher.js'
 import { useKeyboard } from './hooks/useKeyboard.js'
 import { useUiStore } from './store/ui.js'
 import { useNodesStore } from './store/nodes.js'
+import { setExitFn } from './lib/exit.js'
 import type { AppConfig } from './types.js'
 
 interface Props {
@@ -22,7 +23,13 @@ const CONTROLS_HEIGHT = 3
 
 export default function App({ config }: Props) {
   const { stdout } = useStdout()
+  const { exit } = useApp()
   const nodeCount = useNodesStore((s) => s.nodes.length)
+
+  useEffect(() => {
+    setExitFn(exit)
+    return () => setExitFn(null)
+  }, [exit])
 
   useMetricsFetcher(config.interval)
   useKeyboard()

@@ -4,6 +4,7 @@ import { usePodsStore } from '../store/pods.js'
 import { useUiStore } from '../store/ui.js'
 import { podLogs, podDescribe, podDelete, listNamespaceResources, vclusterConnect } from '../lib/kubectl.js'
 import { showActionModal, showFullScreenViewer } from '../lib/outputViewer.js'
+import { requestExit } from '../lib/exit.js'
 
 const SORT_MODES = ['cpu', 'memory', 'status', 'namespace', 'restarts'] as const
 
@@ -15,7 +16,8 @@ export function useKeyboard() {
 
     // q: quit (unless in filter mode)
     if (input === 'q' && !pods.showFilter) {
-      process.exit(0)
+      requestExit()
+      return
     }
 
     // ESC: priority chain

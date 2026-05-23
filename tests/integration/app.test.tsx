@@ -40,6 +40,7 @@ vi.mock('../../src/lib/outputViewer.js', () => ({
 import App from '../../src/app.js'
 import { useNodesStore } from '../../src/store/nodes.js'
 import { usePodsStore } from '../../src/store/pods.js'
+import { setExitFn } from '../../src/lib/exit.js'
 
 async function tick() {
   await new Promise((r) => setTimeout(r, 20))
@@ -173,11 +174,16 @@ describe('App integration', () => {
     expect(lastFrame()).toContain('memory')
   })
 
-  it('q exits the process', async () => {
+  it('q routes through the exit registry instead of calling process.exit directly', async () => {
     const { stdin } = render(<App config={{ interval: 5, historyPoints: 60 }} />)
     await tick()
+    // App's useEffect already registered Ink's useApp().exit; swap it for a spy
+    // so we can observe the request without unmounting the test instance.
+    const exitFn = vi.fn()
+    setExitFn(exitFn)
     stdin.write('q')
     await tick()
-    expect(exitSpy).toHaveBeenCalledWith(0)
+    expect(exitFn).toHaveBeenCalledTimes(1)
+    expect(exitSpy).not.toHaveBeenCalled()
   })
 })

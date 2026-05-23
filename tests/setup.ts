@@ -2,11 +2,13 @@ import { beforeEach } from 'vitest'
 import { useNodesStore } from '../src/store/nodes.js'
 import { usePodsStore } from '../src/store/pods.js'
 import { useUiStore } from '../src/store/ui.js'
+import { setExitFn } from '../src/lib/exit.js'
 
 // Force chalk to emit ANSI color codes in tests so we can assert on them.
 process.env.FORCE_COLOR = '3'
 
 beforeEach(() => {
+  setExitFn(null)
   useNodesStore.setState({ nodes: [], selectedIndex: 0, history: {} })
   usePodsStore.setState({
     pods: [],

@@ -1,5 +1,5 @@
 /**
- * Terminal alternate-screen helpers. Pure I/O via injected Writable + process.
+ * Terminal alternate-screen helpers. Pure I/O via injected Writable.
  */
 import type { Writable } from 'stream'
 
@@ -16,17 +16,4 @@ export function enterAltScreen(out: Writable) {
 export function leaveAltScreen(out: Writable) {
   out.write(SHOW_CURSOR)
   out.write(LEAVE_ALT_SCREEN)
-}
-
-type SignalProc = Pick<NodeJS.Process, 'on' | 'exit'>
-
-/**
- * Register cleanup so leaveAltScreen runs on `exit`, SIGINT, SIGTERM.
- * SIGINT/SIGTERM also exit the process after cleanup.
- */
-export function installSignalCleanup(proc: SignalProc, out: Writable) {
-  const cleanup = () => leaveAltScreen(out)
-  proc.on('exit', cleanup)
-  proc.on('SIGINT', () => { cleanup(); proc.exit(0) })
-  proc.on('SIGTERM', () => { cleanup(); proc.exit(0) })
 }

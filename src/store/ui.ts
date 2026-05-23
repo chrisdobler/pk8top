@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { FocusedPanel } from '../types.js'
 import { usePodsStore } from './pods.js'
+import { requestExit } from '../lib/exit.js'
 
 interface UiState {
   focusedPanel: FocusedPanel
@@ -29,6 +30,6 @@ export const useUiStore = create<UiState>((set, get) => ({
     if (showFilter) { setShowFilter(false); setFilterText(''); return }
     if (focusedPanel === 'pods') { set({ focusedPanel: 'nodes' }); return }
     if (vclusterConnected) { set({ vclusterConnected: false }); return }
-    process.exit(0)
+    requestExit()
   },
 }))
