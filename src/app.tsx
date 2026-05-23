@@ -1,11 +1,12 @@
 import React, { useEffect } from 'react'
-import { Box, useApp, useStdout } from 'ink'
+import { Box, useApp } from 'ink'
 import TrendPanel from './components/TrendPanel.js'
 import NodesPanel from './components/NodesPanel.js'
 import PodsPanel from './components/PodsPanel.js'
 import ControlsBar from './components/ControlsBar.js'
 import { useMetricsFetcher } from './hooks/useMetricsFetcher.js'
 import { useKeyboard } from './hooks/useKeyboard.js'
+import { useTerminalSize } from './hooks/useTerminalSize.js'
 import { useUiStore } from './store/ui.js'
 import { useNodesStore } from './store/nodes.js'
 import { setExitFn } from './lib/exit.js'
@@ -22,7 +23,7 @@ const NODES_OVERHEAD = 7
 const CONTROLS_HEIGHT = 3
 
 export default function App({ config }: Props) {
-  const { stdout } = useStdout()
+  const { rows: termRows } = useTerminalSize()
   const { exit } = useApp()
   const nodeCount = useNodesStore((s) => s.nodes.length)
 
@@ -34,7 +35,6 @@ export default function App({ config }: Props) {
   useMetricsFetcher(config.interval)
   useKeyboard()
 
-  const termRows = stdout?.rows ?? 24
   const nodesHeight = NODES_OVERHEAD + Math.max(1, nodeCount) + 1 // +1 for "All Nodes" row
 
   // TrendPanel fills ~30% of remaining space (after nodes + controls), min 6 rows

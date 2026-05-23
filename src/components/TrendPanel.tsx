@@ -1,6 +1,7 @@
 import React from 'react'
-import { Box, Text, useStdout } from 'ink'
+import { Box, Text } from 'ink'
 import { useNodesStore } from '../store/nodes.js'
+import { useTerminalSize } from '../hooks/useTerminalSize.js'
 
 // Braille-based mirrored bar rendering (btop-style)
 // 0% baseline sits at the vertical center; CPU usage grows symmetrically up and down.
@@ -81,8 +82,7 @@ interface Props {
 export default function TrendPanel({ height }: Props) {
   const history = useNodesStore((s) => s.history)
   const allHistory = history['all'] ?? []
-  const { stdout } = useStdout()
-  const termWidth = stdout?.columns ?? 120
+  const { columns: termWidth } = useTerminalSize()
 
   const current = allHistory.at(-1) ?? 0
   const min = allHistory.length > 1 ? Math.min(...allHistory) : current

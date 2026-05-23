@@ -186,4 +186,17 @@ describe('App integration', () => {
     expect(exitFn).toHaveBeenCalledTimes(1)
     expect(exitSpy).not.toHaveBeenCalled()
   })
+
+  it('re-renders with a taller layout when stdout emits resize', async () => {
+    const { stdout, lastFrame } = render(<App config={{ interval: 5, historyPoints: 60 }} />)
+    await tick()
+    const before = (lastFrame() ?? '').split('\n').length
+
+    Object.defineProperty(stdout, 'rows', { value: 80, configurable: true })
+    stdout.emit('resize')
+    await tick()
+
+    const after = (lastFrame() ?? '').split('\n').length
+    expect(after).toBeGreaterThan(before)
+  })
 })

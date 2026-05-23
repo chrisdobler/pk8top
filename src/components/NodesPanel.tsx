@@ -1,7 +1,8 @@
 import React from 'react'
-import { Box, Text, useStdout } from 'ink'
+import { Box, Text } from 'ink'
 import { useNodesStore } from '../store/nodes.js'
 import { useUiStore } from '../store/ui.js'
+import { useTerminalSize } from '../hooks/useTerminalSize.js'
 import { createCpuBarChars } from '../lib/parsers.js'
 
 const BAR_WIDTH = 20
@@ -36,8 +37,7 @@ export default function NodesPanel() {
   const nodes = useNodesStore((s) => s.nodes)
   const selectedIndex = useNodesStore((s) => s.selectedIndex)
   const focusedPanel = useUiStore((s) => s.focusedPanel)
-  const { stdout } = useStdout()
-  const termWidth = stdout?.columns ?? 120
+  const { columns: termWidth } = useTerminalSize()
 
   if (nodes.length === 0) {
     return (

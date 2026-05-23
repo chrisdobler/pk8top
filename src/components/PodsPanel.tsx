@@ -1,8 +1,9 @@
 import React from 'react'
-import { Box, Text, useStdout } from 'ink'
+import { Box, Text } from 'ink'
 import TextInput from 'ink-text-input'
 import { usePodsStore } from '../store/pods.js'
 import { useUiStore } from '../store/ui.js'
+import { useTerminalSize } from '../hooks/useTerminalSize.js'
 import { formatRestartAge } from '../lib/parsers.js'
 
 interface Props {
@@ -47,8 +48,7 @@ export default function PodsPanel({ windowSize = 20, height }: Props) {
   const sortMode = usePodsStore((s) => s.sortMode)
   const nodeFilter = usePodsStore((s) => s.nodeFilter)
   const focusedPanel = useUiStore((s) => s.focusedPanel)
-  const { stdout } = useStdout()
-  const termWidth = stdout?.columns ?? 120
+  const { columns: termWidth } = useTerminalSize()
 
   // Auto-scroll to keep selected index visible
   let windowStart = scrollOffset
