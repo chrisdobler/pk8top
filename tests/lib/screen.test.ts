@@ -10,10 +10,10 @@ function makeOut() {
 }
 
 describe('enterAltScreen', () => {
-  it('writes enter-alt-screen and hide-cursor sequences', () => {
+  it('writes enter-alt-screen, cursor-home, and hide-cursor sequences', () => {
     const out = makeOut()
     enterAltScreen(out as never)
-    expect(out.writes).toEqual(['\x1b[?1049h', '\x1b[?25l'])
+    expect(out.writes).toEqual(['\x1b[?1049h', '\x1b[H', '\x1b[?25l'])
   })
 })
 
