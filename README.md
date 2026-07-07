@@ -9,7 +9,9 @@ Monitor nodes, pods, and cluster resource usage in real time from your terminal.
 **No operators.**  
 **Just kubectl.**
 
-![pk8top demo](assets/demo.gif)
+| Light mode | Dark mode |
+|---|---|
+| ![pk8top light mode showing Kubernetes node metrics, cluster CPU history, and top pods in a terminal UI](assets/pk8top-light.png) | ![pk8top dark mode showing Kubernetes node metrics, cluster CPU history, and top pods in a terminal UI](assets/pk8top-dark.png) |
 
 ## Install
 
